@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>심플 네모로직</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 { color: #333; }
+        .setup-controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .game-container {
+            display: inline-grid; /* 컨텐츠에 딱 맞게 */
+            grid-template-columns: min-content auto;
+            grid-template-rows: min-content auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .empty { 
+            grid-column: 1; 
+            grid-row: 1; 
+        }
+        .col-hints {
+            grid-column: 2;
+            grid-row: 1;
+            display: flex;
+            border-bottom: 2px solid #333; /* 격자 상단선과 일치 */
+        }
+        .hint-col {
+            width: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            font-size: 12px;
+            padding-bottom: 5px;
+            border-left: 1px solid #eee;
+            box-sizing: border-box;
+        }
+        .row-hints {
+            grid-column: 1;
+            grid-row: 2;
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid #333; /* 격자 좌측선과 일치 */
+        }
+        .hint-row {
+            height: 30px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            font-size: 12px;
+            padding-right: 10px;
+            border-top: 1px solid #eee;
+            box-sizing: border-box;
+            white-space: nowrap; /* 숫자가 줄바꿈되지 않게 */
+        }
+        .grid {
+            grid-column: 2;
+            grid-row: 2;
+            display: grid;
+            border-right: 2px solid #333;
+            border-bottom: 2px solid #333;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            border-right: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+            background-color: white;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+        /* 첫 줄/첫 열 보더 처리 */
+        .cell:nth-child(n) { border-left: none; border-top: none; }
+        
+        /* 5칸마다 강조선 */
+        .v-bold { border-right: 2px solid #666 !important; }
+        .h-bold { border-bottom: 2px solid #666 !important; }
+
+        .cell.filled {
+            background-color: #333;
+        }
+        .cell.marked {
+            position: relative;
+        }
+        .cell.marked::after {
+            content: "X";
+            color: #e74c3c;
+            font-weight: bold;
+            font-size: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #2980b9; }
+        button.success { background-color: #27ae60; }
+        button.success:hover { background-color: #219150; }
+        #message {
+            margin-top: 15px;
+            font-weight: bold;
+            height: 24px;
+        }
+
+        /* 모달 배경 (Glassmorphism & Fade transition) */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            opacity: 1;
+        }
+
+        /* 모달 콘텐츠 박스 */
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            text-align: center;
+            position: relative;
+            max-width: 400px;
+            width: 90%;
+            transform: scale(0.7);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .modal.show .modal-content {
+            transform: scale(1);
+        }
+
+        /* 닫기 버튼 */
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        /* 빵빠레 이미지 */
+        .victory-img {
+            width: 100%;
+            max-width: 250px;
+            height: auto;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .modal-content h2 {
+            color: #27ae60;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .modal-content p {
+            color: #555;
+            margin-bottom: 25px;
+            font-size: 16px;
+        }
+
+        .modal-btn {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            font-weight: bold;
+        }
+
+        .modal-btn:hover {
+            background-color: #219150;
+            transform: translateY(-2px);
+        }
+
+        .modal-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <h1>네모로직</h1>
+    
+    <div class="setup-controls">
+        <select id="sizeSelect">
+            <option value="5">5 x 5</option>
+            <option value="10" selected>10 x 10</option>
+            <option value="15">15 x 15</option>
+        </select>
+        <button onclick="startNewGame()">새 게임 만들기</button>
+    </div>
+
+    <div class="game-container">
+        <div class="empty"></div>
+        <div id="colHints" class="col-hints"></div>
+        <div id="rowHints" class="row-hints"></div>
+        <div id="grid" class="grid"></div>
+    </div>
+    
+    <div class="controls">
+        <button class="success" onclick="checkAnswer()">정답 확인</button>
+        <button onclick="resetCurrentGame()">다시 칠하기</button>
+    </div>
+    <p id="message"></p>
+
+    <!-- 승리 모달 팝업 -->
+    <div id="victoryModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <img src="fanfare.png" alt="축하합니다" class="victory-img">
+            <h2>🎉 축하합니다! 🎉</h2>
+            <p>네모로직 퍼즐을 성공적으로 해결하셨습니다!</p>
+            <button class="modal-btn" onclick="startNewGameFromModal()">새 게임 시작하기</button>
+        </div>
+    </div>
+
+    <script>
+        let size = 10;
+        let solution = [];
+        let userGrid = [];
+        let isDragging = false;
+        let dragMode = null; // 'fill', 'unfill', 'mark', 'unmark'
+        let dragAxis = null; // 'row', 'col'
+        let startR = null;
+        let startC = null;
+
+        function startNewGame() {
+            size = parseInt(document.getElementById('sizeSelect').value);
+            generateRandomSolution();
+            initGameUI();
+            document.getElementById('message').textContent = "";
+        }
+
+        function generateRandomSolution() {
+            solution = Array(size).fill().map(() => 
+                Array(size).fill().map(() => Math.random() > 0.4 ? 1 : 0)
+            );
+            if (solution.flat().every(v => v === 0)) {
+                solution[Math.floor(Math.random()*size)][Math.floor(Math.random()*size)] = 1;
+            }
+        }
+
+        function initGameUI() {
+            userGrid = Array(size).fill().map(() => Array(size).fill(0));
+            
+            const grid = document.getElementById('grid');
+            const rowHints = document.getElementById('rowHints');
+            const colHints = document.getElementById('colHints');
+
+            grid.innerHTML = '';
+            rowHints.innerHTML = '';
+            colHints.innerHTML = '';
+
+            grid.style.gridTemplateColumns = `repeat(${size}, 30px)`;
+            grid.style.gridTemplateRows = `repeat(${size}, 30px)`;
+
+            for (let r = 0; r < size; r++) {
+                const hints = getHints(solution[r]);
+                const div = document.createElement('div');
+                div.className = 'hint-row';
+                if ((r + 1) % 5 === 0 && (r + 1) !== size) div.classList.add('h-bold');
+                div.textContent = hints.join(' ');
+                rowHints.appendChild(div);
+            }
+
+            for (let c = 0; c < size; c++) {
+                const colArr = solution.map(row => row[c]);
+                const hints = getHints(colArr);
+                const div = document.createElement('div');
+                div.className = 'hint-col';
+                if ((c + 1) % 5 === 0 && (c + 1) !== size) div.classList.add('v-bold');
+                hints.forEach(h => {
+                    const span = document.createElement('span');
+                    span.textContent = h;
+                    div.appendChild(span);
+                });
+                colHints.appendChild(div);
+            }
+
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    if ((c + 1) % 5 === 0 && (c + 1) !== size) cell.classList.add('v-bold');
+                    if ((r + 1) % 5 === 0 && (r + 1) !== size) cell.classList.add('h-bold');
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    
+                    cell.onmousedown = (e) => {
+                        e.preventDefault();
+                        isDragging = true;
+                        startR = r;
+                        startC = c;
+                        dragAxis = null; // 축 초기화
+
+                        if (e.button === 0) { // 왼쪽 클릭
+                            dragMode = cell.classList.contains('filled') ? 'unfill' : 'fill';
+                            handleAction(r, c, cell, dragMode);
+                        } else if (e.button === 2) { // 오른쪽 클릭
+                            dragMode = cell.classList.contains('marked') ? 'unmark' : 'mark';
+                            handleAction(r, c, cell, dragMode);
+                        }
+                    };
+
+                    cell.onmouseenter = () => {
+                        if (isDragging) {
+                            // 축 결정 로직 (처음 움직였을 때)
+                            if (!dragAxis) {
+                                if (r !== startR) dragAxis = 'col';
+                                else if (c !== startC) dragAxis = 'row';
+                            }
+
+                            // 결정된 축에 따라서만 동작
+                            if (dragAxis === 'row' && r === startR) {
+                                handleAction(r, c, cell, dragMode);
+                            } else if (dragAxis === 'col' && c === startC) {
+                                handleAction(r, c, cell, dragMode);
+                            }
+                        }
+                    };
+
+                    cell.oncontextmenu = (e) => e.preventDefault();
+                    
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        // 전역 마우스 업 이벤트 (그리드 밖에서 떼도 멈추게)
+        window.onmouseup = () => {
+            isDragging = false;
+            dragMode = null;
+            dragAxis = null;
+            startR = null;
+            startC = null;
+        };
+
+        function handleAction(r, c, el, mode) {
+            if (mode === 'fill') {
+                if (!el.classList.contains('marked')) {
+                    el.classList.add('filled');
+                    userGrid[r][c] = 1;
+                }
+            } else if (mode === 'unfill') {
+                el.classList.remove('filled');
+                userGrid[r][c] = 0;
+            } else if (mode === 'mark') {
+                if (!el.classList.contains('filled')) {
+                    el.classList.add('marked');
+                }
+            } else if (mode === 'unmark') {
+                el.classList.remove('marked');
+            }
+            document.getElementById('message').textContent = "";
+        }
+
+        function getHints(arr) {
+            const hints = [];
+            let count = 0;
+            arr.forEach(val => {
+                if (val === 1) count++;
+                else if (count > 0) {
+                    hints.push(count);
+                    count = 0;
+                }
+            });
+            if (count > 0) hints.push(count);
+            return hints.length ? hints : [0];
+        }
+
+        function checkAnswer() {
+            let win = true;
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (userGrid[r][c] !== solution[r][c]) {
+                        win = false;
+                        break;
+                    }
+                }
+            }
+            const msg = document.getElementById('message');
+            if (win) {
+                msg.textContent = "🎉 축하합니다! 정답입니다!";
+                msg.style.color = "#27ae60";
+                showModal();
+            } else {
+                msg.textContent = "❌ 틀린 부분이 있습니다. 다시 확인해 보세요.";
+                msg.style.color = "#e74c3c";
+            }
+        }
+
+        function showModal() {
+            const modal = document.getElementById('victoryModal');
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.classList.add('show');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('victoryModal');
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
+        function startNewGameFromModal() {
+            closeModal();
+            setTimeout(() => {
+                startNewGame();
+            }, 300);
+        }
+
+        function resetCurrentGame() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                cell.classList.remove('filled', 'marked');
+            });
+            userGrid = Array(size).fill().map(() => Array(size).fill(0));
+            document.getElementById('message').textContent = "";
+        }
+
+        startNewGame();
+    </script>
+</body>
+</html>
