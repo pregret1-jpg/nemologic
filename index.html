@@ -127,9 +127,14 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: background 0.3s, opacity 0.3s;
         }
         button:hover { background-color: #2980b9; }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
         button.success { background-color: #27ae60; }
         button.success:hover { background-color: #219150; }
         #message {
@@ -258,6 +263,8 @@
     </div>
     
     <div class="controls">
+        <button id="undoBtn" onclick="undo()" disabled>되돌리기</button>
+        <button id="redoBtn" onclick="redo()" disabled>다시 실행</button>
         <button class="success" onclick="checkAnswer()">정답 확인</button>
         <button onclick="resetCurrentGame()">다시 칠하기</button>
     </div>
@@ -283,11 +290,16 @@
         let dragAxis = null; // 'row', 'col'
         let startR = null;
         let startC = null;
+        let undoStack = [];
+        let redoStack = [];
 
         function startNewGame() {
             size = parseInt(document.getElementById('sizeSelect').value);
+            undoStack = [];
+            redoStack = [];
             generateRandomSolution();
             initGameUI();
+            updateUndoRedoButtons();
             document.getElementById('message').textContent = "";
         }
 
@@ -347,11 +359,14 @@
                     cell.dataset.c = c;
                     
                     cell.onmousedown = (e) => {
+                        if (e.button !== 0 && e.button !== 2) return;
                         e.preventDefault();
                         isDragging = true;
                         startR = r;
                         startC = c;
                         dragAxis = null; // 축 초기화
+                        
+                        saveState();
 
                         if (e.button === 0) { // 왼쪽 클릭
                             dragMode = cell.classList.contains('filled') ? 'unfill' : 'fill';
@@ -388,11 +403,19 @@
 
         // 전역 마우스 업 이벤트 (그리드 밖에서 떼도 멈추게)
         window.onmouseup = () => {
-            isDragging = false;
-            dragMode = null;
-            dragAxis = null;
-            startR = null;
-            startC = null;
+            if (isDragging) {
+                isDragging = false;
+                dragMode = null;
+                dragAxis = null;
+                startR = null;
+                startC = null;
+                
+                // 변경된 점이 없으면 불필요한 Undo 스택 상태 제거
+                if (undoStack.length > 0 && gridsAreEqual(userGrid, undoStack[undoStack.length - 1])) {
+                    undoStack.pop();
+                    updateUndoRedoButtons();
+                }
+            }
         };
 
         function handleAction(r, c, el, mode) {
@@ -407,9 +430,11 @@
             } else if (mode === 'mark') {
                 if (!el.classList.contains('filled')) {
                     el.classList.add('marked');
+                    userGrid[r][c] = 2;
                 }
             } else if (mode === 'unmark') {
                 el.classList.remove('marked');
+                userGrid[r][c] = 0;
             }
             document.getElementById('message').textContent = "";
         }
@@ -432,7 +457,8 @@
             let win = true;
             for (let r = 0; r < size; r++) {
                 for (let c = 0; c < size; c++) {
-                    if (userGrid[r][c] !== solution[r][c]) {
+                    const userFilled = (userGrid[r][c] === 1) ? 1 : 0;
+                    if (userFilled !== solution[r][c]) {
                         win = false;
                         break;
                     }
@@ -473,6 +499,7 @@
         }
 
         function resetCurrentGame() {
+            saveState();
             const cells = document.querySelectorAll('.cell');
             cells.forEach(cell => {
                 cell.classList.remove('filled', 'marked');
@@ -480,6 +507,88 @@
             userGrid = Array(size).fill().map(() => Array(size).fill(0));
             document.getElementById('message').textContent = "";
         }
+
+        // Undo/Redo 관련 핵심 함수들
+        function saveState() {
+            undoStack.push(userGrid.map(row => [...row]));
+            redoStack = [];
+            updateUndoRedoButtons();
+        }
+
+        function undo() {
+            if (undoStack.length === 0) return;
+            redoStack.push(userGrid.map(row => [...row]));
+            const prevState = undoStack.pop();
+            applyState(prevState);
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            undoStack.push(userGrid.map(row => [...row]));
+            const nextState = redoStack.pop();
+            applyState(nextState);
+        }
+
+        function applyState(state) {
+            userGrid = state;
+            syncGridToUI();
+            updateUndoRedoButtons();
+        }
+
+        function syncGridToUI() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const r = parseInt(cell.dataset.r);
+                const c = parseInt(cell.dataset.c);
+                const val = userGrid[r][c];
+                
+                if (val === 1) {
+                    cell.classList.add('filled');
+                    cell.classList.remove('marked');
+                } else if (val === 2) {
+                    cell.classList.remove('filled');
+                    cell.classList.add('marked');
+                } else {
+                    cell.classList.remove('filled', 'marked');
+                }
+            });
+        }
+
+        function updateUndoRedoButtons() {
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            if (undoBtn) undoBtn.disabled = (undoStack.length === 0);
+            if (redoBtn) redoBtn.disabled = (redoStack.length === 0);
+        }
+
+        function gridsAreEqual(grid1, grid2) {
+            if (!grid1 || !grid2) return false;
+            if (grid1.length !== grid2.length) return false;
+            for (let r = 0; r < grid1.length; r++) {
+                if (grid1[r].length !== grid2[r].length) return false;
+                for (let c = 0; c < grid1[r].length; c++) {
+                    if (grid1[r][c] !== grid2[r][c]) return false;
+                }
+            }
+            return true;
+        }
+
+        // 단축키 이벤트 리스너 등록
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        redo();
+                    } else {
+                        undo();
+                    }
+                } else if (e.key.toLowerCase() === 'y') {
+                    e.preventDefault();
+                    redo();
+                }
+            }
+        });
 
         startNewGame();
     </script>
