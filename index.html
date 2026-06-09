@@ -265,7 +265,8 @@
     <h1>네모로직</h1>
     
     <div class="setup-controls">
-        <select id="sizeSelect">
+        <label for="sizeSelect" style="font-weight: bold; font-size: 14px; color: #555;">크기:</label>
+        <select id="sizeSelect" style="margin-right: 10px;">
             <option value="5">5 x 5</option>
             <option value="10" selected>10 x 10</option>
             <option value="15">15 x 15</option>
@@ -627,7 +628,9 @@
                 rowDivs.forEach(div => {
                     const r = parseInt(div.dataset.r);
                     if (isNaN(r)) return;
-                    const matchedIndices = getMatchedHintIndicesCorrectness(solution[r], userGrid[r]);
+                    
+                    const matchedIndices = getMatchedHintIndicesUser(solution[r], userGrid[r]);
+                    const totalHintsCount = getHints(solution[r]).length;
                     
                     const spans = div.querySelectorAll('span');
                     spans.forEach(span => {
@@ -640,10 +643,7 @@
                     });
 
                     // Auto-fill X for completed rows
-                    const correctBlocks = getCorrectBlocksInfo(solution[r]);
-                    const isRowCompleted = (correctBlocks.length === 0) 
-                        ? !userGrid[r].includes(1) 
-                        : (matchedIndices.size === correctBlocks.length);
+                    const isRowCompleted = (matchedIndices.size === totalHintsCount);
 
                     if (isRowCompleted) {
                         for (let c = 0; c < size; c++) {
@@ -665,9 +665,12 @@
                 colDivs.forEach(div => {
                     const c = parseInt(div.dataset.c);
                     if (isNaN(c)) return;
+                    
                     const colArr = solution.map(row => row[c]);
                     const userColArr = userGrid.map(row => row[c]);
-                    const matchedIndices = getMatchedHintIndicesCorrectness(colArr, userColArr);
+                    
+                    const matchedIndices = getMatchedHintIndicesUser(colArr, userColArr);
+                    const totalHintsCount = getHints(colArr).length;
                     
                     const spans = div.querySelectorAll('span');
                     spans.forEach(span => {
@@ -680,10 +683,7 @@
                     });
 
                     // Auto-fill X for completed cols
-                    const correctBlocks = getCorrectBlocksInfo(colArr);
-                    const isColCompleted = (correctBlocks.length === 0)
-                        ? !userColArr.includes(1)
-                        : (matchedIndices.size === correctBlocks.length);
+                    const isColCompleted = (matchedIndices.size === totalHintsCount);
 
                     if (isColCompleted) {
                         for (let r = 0; r < size; r++) {
@@ -703,60 +703,120 @@
             checkAnswer();
         }
 
-        function getCorrectBlocksInfo(solutionLine) {
-            const blocks = [];
-            let start = -1;
-            for (let i = 0; i < solutionLine.length; i++) {
-                if (solutionLine[i] === 1) {
-                    if (start === -1) {
-                        start = i;
+        function getMatchedHintIndicesUser(solutionLine, userLine) {
+            const hints = getHints(solutionLine);
+            const userBlocks = [];
+            let startIdx = -1;
+            
+            // 유저가 칠한 검은 칸(1)들의 물리적 위치(시작/끝 인덱스)와 블록 크기를 추출합니다.
+            for (let i = 0; i < userLine.length; i++) {
+                if (userLine[i] === 1) {
+                    if (startIdx === -1) {
+                        startIdx = i;
                     }
                 } else {
-                    if (start !== -1) {
-                        blocks.push({ start: start, length: i - start });
-                        start = -1;
+                    if (startIdx !== -1) {
+                        userBlocks.push({ start: startIdx, end: i - 1, length: i - startIdx });
+                        startIdx = -1;
                     }
                 }
             }
-            if (start !== -1) {
-                blocks.push({ start: start, length: solutionLine.length - start });
+            if (startIdx !== -1) {
+                userBlocks.push({ start: startIdx, end: userLine.length - 1, length: userLine.length - startIdx });
             }
-            return blocks;
-        }
 
-        function getMatchedHintIndicesCorrectness(solutionLine, userLine) {
-            const correctBlocks = getCorrectBlocksInfo(solutionLine);
             const matched = new Set();
             
-            if (correctBlocks.length === 0) {
-                const hasFilled = userLine.some(val => val === 1);
-                if (!hasFilled) {
+            // 0 힌트(빈 줄) 예외 처리
+            if (hints.length === 1 && hints[0] === 0) {
+                if (userBlocks.length === 0) {
                     matched.add(0);
                 }
                 return matched;
             }
-            
-            correctBlocks.forEach((block, index) => {
-                let isCorrect = true;
-                for (let j = block.start; j < block.start + block.length; j++) {
-                    if (userLine[j] !== 1) {
-                        isCorrect = false;
-                        break;
+
+            const m = userBlocks.length;
+            const n = hints.length;
+
+            // ==========================================
+            // [규칙 1] 체크하면 힌트 개수가 일치하는 방향으로 매칭 (Greedy)
+            // ==========================================
+
+            // 1-1. 정방향 매칭 (왼쪽/위쪽 -> 오른쪽/아래쪽 순차 대조)
+            let forwardLimit = 0;
+            for (let i = 0; i < n && i < m; i++) {
+                if (userBlocks[i].length === hints[i]) {
+                    forwardLimit = i + 1;
+                } else {
+                    break;
+                }
+            }
+
+            // 1-2. 역방향 매칭 (오른쪽/아래쪽 -> 왼쪽/위쪽 순차 대조)
+            let backwardLimit = 0;
+            for (let j = 0; j < n && j < m; j++) {
+                const uIdx = m - 1 - j;
+                const hIdx = n - 1 - j;
+                if (userBlocks[uIdx].length === hints[hIdx]) {
+                    backwardLimit = j + 1;
+                } else {
+                    break;
+                }
+            }
+
+            // 1-3. 더 많이 매칭된 방향이 있다면 해당 방향을 우선적으로 매칭
+            if (forwardLimit > backwardLimit) {
+                for (let i = 0; i < forwardLimit; i++) {
+                    matched.add(i);
+                }
+            } else if (backwardLimit > forwardLimit) {
+                for (let j = 0; j < backwardLimit; j++) {
+                    matched.add(n - 1 - j);
+                }
+            } else {
+                // ==========================================
+                // [규칙 2] 매칭 개수가 같아 모호성(충돌) 발생 시, 물리적 중심으로 판정
+                // ==========================================
+                const uMap = Array(m).fill(-1);
+
+                for (let i = 0; i < forwardLimit; i++) {
+                    uMap[i] = i;
+                }
+
+                for (let j = 0; j < backwardLimit; j++) {
+                    const uIdx = m - 1 - j;
+                    const hIdx = n - 1 - j;
+                    
+                    if (uMap[uIdx] === -1) {
+                        uMap[uIdx] = hIdx;
+                    } else {
+                        // 하나의 블록이 서로 다른 힌트 인덱스를 가리키며 충돌하는 경우
+                        if (uMap[uIdx] !== hIdx) {
+                            const block = userBlocks[uIdx];
+                            const blockCenter = (block.start + block.end) / 2;
+                            const boardCenter = userLine.length / 2; // 전체 보드의 중앙값
+                            
+                            if (blockCenter < boardCenter) {
+                                // 보드 중심보다 왼쪽/위쪽에 치우쳐 있으면 정방향 힌트 채택
+                                // uMap[uIdx]는 이미 forward 값으로 채워져 있으므로 그대로 유지
+                            } else if (blockCenter > boardCenter) {
+                                // 보드 중심보다 오른쪽/아래쪽에 치우쳐 있으면 역방향 힌트 채택
+                                uMap[uIdx] = hIdx;
+                            } else {
+                                // 정확히 보드 한가운데 걸쳐 있어 여전히 모호하면 매칭에서 제외
+                                uMap[uIdx] = -1;
+                            }
+                        }
                     }
                 }
-                if (isCorrect) {
-                    if (block.start > 0 && userLine[block.start - 1] === 1) {
-                        isCorrect = false;
+
+                uMap.forEach(hIdx => {
+                    if (hIdx !== -1) {
+                        matched.add(hIdx);
                     }
-                    if (block.start + block.length < userLine.length && userLine[block.start + block.length] === 1) {
-                        isCorrect = false;
-                    }
-                }
-                
-                if (isCorrect) {
-                    matched.add(index);
-                }
-            });
+                });
+            }
+
             return matched;
         }
 
