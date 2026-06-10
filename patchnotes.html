@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>네모로직 패치노트 - v1.2.0</title>
+    <title>네모로직 패치노트 - v1.2.1</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap');
 
@@ -228,14 +228,14 @@
 
     <div class="container">
         <header>
-            <div class="version-badge">PATCH v1.2.0</div>
+            <div class="version-badge">PATCH v1.2.1</div>
             <h1>네모로직 패치노트</h1>
-            <div class="patch-date">2026.06.09 • UPDATE RELEASE</div>
+            <div class="patch-date">2026.06.10 • MOBILE & CONTROL UPDATE</div>
         </header>
 
         <main class="card">
             <p class="intro-text">
-                어제 진행된 힌트 완료 기능의 아쉬웠던 부분을 대폭 수정하고, 오직 플레이어의 직관적인 논리 추론만으로 퍼즐을 풀 수 있도록 자동 힌트 시스템을 완성한 대규모 정비 업데이트입니다.
+                어제 적용된 논리 기반 자동 힌트 시스템에 이어, 모바일 사용자를 위한 원터치 도구 버튼 및 터치 드래그 트래킹을 고도화하고, 전체 레이아웃을 콤팩트하게 다듬어 모바일 최적화를 완료한 마이너 업데이트입니다.
             </p>
 
             <h2>주요 변경 사항</h2>
@@ -243,37 +243,37 @@
             <div class="feature-list">
                 <div class="feature-item">
                     <div class="feature-title">
-                        <span>🧠</span> 1. 유저 입력 기준 자동 체크 단일화
+                        <span>📱</span> 1. 모바일용 칠하기/X 토글 버튼 및 터치 드래그 연동
                     </div>
                     <div class="feature-desc">
-                        기존의 "정답 기준 자동 체크"와 "수동 체크" 모드를 완전히 배제하고, 오직 <strong>"사용자가 칠해 놓은 칸들의 크기 및 순서"</strong>만을 기준으로 힌트 완료를 판정하는 방식으로 룰을 일원화했습니다. 정답 위치를 컴퓨터가 미리 스포일러하지 않으면서도, 완성된 형태는 즉각 인지하여 편리하게 X(마크)를 채워줍니다.
+                        마우스 우클릭을 사용할 수 없는 모바일 기기를 위해, 하단 조작 바에 <strong>조작 모드 전환 버튼</strong>("모드: 체크 ⬛" ⇄ "모드: X ❌")을 배치하여 원터치로 도구를 바꿀 수 있게 조작계를 개편했습니다. 또한 터치 이동 이벤트를 캡처하는 `ontouchmove` 최적화를 적용해 모바일 터치 드래그 페인팅 동작이 엇나감 없이 부드럽게 지원됩니다. (PC에서는 마우스 우클릭을 통한 퀵 X 기능이 그대로 유지됩니다.)
                     </div>
                 </div>
 
                 <div class="feature-item">
                     <div class="feature-title">
-                        <span>🔄</span> 2. 정밀한 양방향 Greedy 매칭 탑재
+                        <span>🔍</span> 2. 초밀착 힌트 레이아웃 최적화
                     </div>
                     <div class="feature-desc">
-                        유저가 퍼즐을 왼쪽(위쪽)부터 순서대로 풀거나, 오른쪽(아래쪽)부터 순서대로 풀어나가더라도 상관없이 유연하게 감지하는 양방향 매칭 방식을 도입했습니다. 이를 통해 사용자가 아래에서부터 `2`와 `1`을 칠했을 때 힌트에서도 아래의 `2`와 `1`이 정확하게 체크됩니다.
+                        모바일 가로화면 폭에서도 퍼즐 판이 한눈에 꽉 들어차도록 전체 크기를 극도로 밀착시켰습니다. 가로 및 세로 힌트 상자 크기를 모두 <strong>`12px x 12px`</strong>로 대폭 줄였으며, 상자 간 여백을 가로 `-1px`(겹침), 세로 `2px`로 압축하여 여백을 좁히고 모바일 핏을 크게 향상시켰습니다.
                     </div>
                 </div>
 
                 <div class="feature-item">
                     <div class="feature-title">
-                        <span>🧭</span> 3. 물리적 위치(중심선) 기반 모호성 제어
+                        <span>💡</span> 3. 완료 힌트 투명도 최적화 (0.75 → 0.70)
                     </div>
                     <div class="feature-desc">
-                        힌트의 숫자가 대칭적이거나 중복될 때(예: `4 1 1 4`) 어떤 힌트를 켜야 할지 모호한 경우, 사용자가 실제로 칠한 칸들의 <strong>격자판 상 중심 좌표</strong>를 자동으로 계산합니다. 칠해진 블록이 보드의 왼쪽 영역에 있다면 왼쪽 힌트 `4`를, 오른쪽 영역에 있다면 오른쪽 힌트 `4`를 선택해 켜주는 영리한 공간 감지 알고리즘을 도입했습니다.
+                        완료된 힌트가 미완료 힌트와 확실하게 시각적으로 분리될 수 있도록 완료 힌트 텍스트의 폰트 투명도를 <strong>`0.7`</strong>(연한 회색조 `#999`)로 최종 튜닝했습니다. 격자판의 진행도를 파악하기 수월해져 눈의 피로감을 대폭 덜어줍니다.
                     </div>
                 </div>
 
                 <div class="feature-item">
                     <div class="feature-title">
-                        <span>🧹</span> 4. 최적화 및 유휴 코드 제거
+                        <span>📐</span> 4. 힌트 폰트 미세 조정 및 모바일 패딩 대응
                     </div>
                     <div class="feature-desc">
-                        수동 체크용 메모 관련 CSS와 클릭 이벤트 리스너들을 모두 걷어내고, 사용하지 않는 구형 매칭 판정 함수(`getCorrectBlocksInfo`, `getMatchedHintIndicesCorrectness`)들을 대대적으로 청소하여 파일 용량을 최적화하고 렌더링 성능을 강화했습니다.
+                        12px 크기 힌트 상자 속에서도 힌트 숫자가 가려지지 않고 또렷하게 보일 수 있도록 폰트 크기를 <strong>`10.5px`</strong>(가로) 및 <strong>`10.5px`</strong>(세로)로 미세 조절했습니다. 모바일 가로폭 대응 미디어 쿼리를 추가하여 모바일 기기에서의 외부 패딩을 8px로 축소했습니다.
                     </div>
                 </div>
             </div>
@@ -282,7 +282,7 @@
 
             <h2>비하인드 노트</h2>
             <div class="feature-desc" style="margin-left: 0; line-height: 1.7;">
-                이번 패치를 통해, 사용자가 칠하면서 정답 위치 힌트를 얻어내는 다소 '쉬운' 난이도를 극복하고, 네모로직 실물 책이나 전문 퍼즐러들이 즐기는 <strong>"철저한 논리적 손맛"</strong>을 완벽히 살릴 수 있게 되었습니다. 공간적 치우침까지 파악하여 동작하는 스마트한 오토 체크와 함께 한층 깊어진 추론의 재미를 즐겨보세요!
+                이번 패치를 통해, 어제 구축한 "스마트 오토 체크" 논리 시스템의 강점을 모바일에서도 그대로 누릴 수 있게 되었습니다. 모바일 탭 도구 전환과 정밀한 손가락 드래그 감지 기능을 이용하여 모바일 웹에서도 지하철이나 야외 어디서든 퍼즐을 쾌적하고 조밀하게 풀어나가는 논리적 즐거움을 맛보세요!
             </div>
         </main>
 
