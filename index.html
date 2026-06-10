@@ -52,8 +52,8 @@
             flex-direction: column;
             justify-content: flex-end;
             align-items: center;
-            font-size: 12px;
-            padding-bottom: 5px;
+            font-size: 11px;
+            padding-bottom: 3px;
             border-left: 1px solid #eee;
             box-sizing: border-box;
         }
@@ -69,8 +69,8 @@
             display: flex;
             justify-content: flex-end;
             align-items: center;
-            font-size: 12px;
-            padding-right: 10px;
+            font-size: 11px;
+            padding-right: 5px;
             border-top: 1px solid #eee;
             box-sizing: border-box;
             white-space: nowrap; /* 숫자가 줄바꿈되지 않게 */
@@ -244,8 +244,6 @@
 
         .hint-row span, .hint-col span {
             transition: all 0.2s ease;
-            width: 20px;
-            height: 20px;
             display: inline-flex;
             justify-content: center;
             align-items: center;
@@ -254,10 +252,50 @@
             border-radius: 50%;
         }
         .hint-row span {
-            margin-left: 4px;
+            width: 12px;
+            height: 12px;
+            font-size: 10.5px;
+            margin-left: -1px;
+        }
+        .hint-col span {
+            width: 12px;
+            height: 12px;
+            font-size: 10.5px;
+            margin-top: 2px;
         }
         .hint-completed {
-            border-color: #2ecc71 !important;
+            color: #999 !important;
+            opacity: 0.7;
+        }
+        button.tool-btn {
+            font-weight: bold;
+        }
+        button.tool-btn.fill-mode {
+            background-color: #2ecc71; /* Green for check */
+        }
+        button.tool-btn.fill-mode:hover {
+            background-color: #27ae60;
+        }
+        button.tool-btn.mark-mode {
+            background-color: #e74c3c; /* Red for X */
+        }
+        button.tool-btn.mark-mode:hover {
+            background-color: #c0392b;
+        }
+
+        /* 모바일 화면 최적화 */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px 5px;
+            }
+            .game-container {
+                padding: 8px;
+                border-radius: 8px;
+            }
+            .setup-controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -282,6 +320,7 @@
     </div>
     
     <div class="controls">
+        <button id="toolToggleBtn" onclick="toggleTool()" class="tool-btn fill-mode">모드: 체크 ⬛</button>
         <button id="undoBtn" onclick="undo()" disabled>되돌리기</button>
         <button id="redoBtn" onclick="redo()" disabled>다시 실행</button>
         <button onclick="resetCurrentGame()">다시 칠하기</button>
@@ -310,6 +349,20 @@
         let startC = null;
         let undoStack = [];
         let redoStack = [];
+        let currentTool = 'fill'; // 'fill' or 'mark'
+
+        function toggleTool() {
+            const btn = document.getElementById('toolToggleBtn');
+            if (currentTool === 'fill') {
+                currentTool = 'mark';
+                btn.textContent = '모드: X ❌';
+                btn.className = 'tool-btn mark-mode';
+            } else {
+                currentTool = 'fill';
+                btn.textContent = '모드: 체크 ⬛';
+                btn.className = 'tool-btn fill-mode';
+            }
+        }
 
         function startNewGame() {
             size = parseInt(document.getElementById('sizeSelect').value);
@@ -394,13 +447,35 @@
                         
                         saveState();
 
-                        if (e.button === 0) { // 왼쪽 클릭
-                            dragMode = cell.classList.contains('filled') ? 'unfill' : 'fill';
+                        if (e.button === 0) { // 왼쪽 클릭 / 터치
+                            if (currentTool === 'fill') {
+                                dragMode = cell.classList.contains('filled') ? 'unfill' : 'fill';
+                            } else {
+                                dragMode = cell.classList.contains('marked') ? 'unmark' : 'mark';
+                            }
                             handleAction(r, c, cell, dragMode);
                         } else if (e.button === 2) { // 오른쪽 클릭
                             dragMode = cell.classList.contains('marked') ? 'unmark' : 'mark';
                             handleAction(r, c, cell, dragMode);
                         }
+                    };
+
+                    // 모바일 터치 시작 지원
+                    cell.ontouchstart = (e) => {
+                        e.preventDefault();
+                        isDragging = true;
+                        startR = r;
+                        startC = c;
+                        dragAxis = null;
+                        
+                        saveState();
+                        
+                        if (currentTool === 'fill') {
+                            dragMode = cell.classList.contains('filled') ? 'unfill' : 'fill';
+                        } else {
+                            dragMode = cell.classList.contains('marked') ? 'unmark' : 'mark';
+                        }
+                        handleAction(r, c, cell, dragMode);
                     };
 
                     cell.onmouseenter = () => {
@@ -425,11 +500,36 @@
                     grid.appendChild(cell);
                 }
             }
+
+            // 모바일 터치 드래그 지원
+            grid.ontouchmove = (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (target && target.classList.contains('cell')) {
+                    const r = parseInt(target.dataset.r);
+                    const c = parseInt(target.dataset.c);
+                    if (isNaN(r) || isNaN(c)) return;
+
+                    if (!dragAxis) {
+                        if (r !== startR) dragAxis = 'col';
+                        else if (c !== startC) dragAxis = 'row';
+                    }
+
+                    if (dragAxis === 'row' && r === startR) {
+                        handleAction(r, c, target, dragMode);
+                    } else if (dragAxis === 'col' && c === startC) {
+                        handleAction(r, c, target, dragMode);
+                    }
+                }
+            };
+
             updateHintStyles();
         }
 
-        // 전역 마우스 업 이벤트 (그리드 밖에서 떼도 멈추게)
-        window.onmouseup = () => {
+        // 전역 마우스/터치 업 이벤트 (그리드 밖에서 떼도 멈추게)
+        const stopDragging = () => {
             if (isDragging) {
                 isDragging = false;
                 dragMode = null;
@@ -444,6 +544,9 @@
                 }
             }
         };
+        window.onmouseup = stopDragging;
+        window.addEventListener('touchend', stopDragging);
+        window.addEventListener('touchcancel', stopDragging);
 
         function handleAction(r, c, el, mode) {
             if (mode === 'fill') {
