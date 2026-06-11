@@ -464,7 +464,10 @@
 <body>
     <div class="header-container">
         <h1>대중소 네모로직</h1>
-        <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-btn">🌙 다크 모드</button>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <span id="clearCountDisplay" style="font-size: 14px; font-weight: 600; color: var(--text-secondary);">🏆 완료: 0회</span>
+            <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-btn">🌙 다크 모드</button>
+        </div>
     </div>
     
     <div class="setup-controls">
@@ -499,6 +502,7 @@
             <img src="fanfare.png" alt="축하합니다" class="victory-img">
             <h2>🎉 축하합니다! 🎉</h2>
             <p>네모로직 퍼즐을 성공적으로 해결하셨습니다!</p>
+            <p id="modalClearCount" style="font-weight: 600; color: var(--btn-success); margin-top: -10px; margin-bottom: 20px;">누적 완료 횟수: 0회</p>
             <button class="modal-btn" onclick="startNewGameFromModal()">새 게임 시작하기</button>
         </div>
     </div>
@@ -515,6 +519,19 @@
         let undoStack = [];
         let redoStack = [];
         let currentTool = 'fill'; // 'fill' or 'mark'
+        let clearCount = parseInt(localStorage.getItem('nemologic_clear_count') || '0');
+        let isGameFinished = false;
+
+        function updateClearCountUI() {
+            const display = document.getElementById('clearCountDisplay');
+            if (display) {
+                display.textContent = `🏆 완료: ${clearCount}회`;
+            }
+            const modalDisplay = document.getElementById('modalClearCount');
+            if (modalDisplay) {
+                modalDisplay.textContent = `누적 완료 횟수: ${clearCount}회`;
+            }
+        }
 
         function toggleTool() {
             const btn = document.getElementById('toolToggleBtn');
@@ -533,6 +550,7 @@
             size = parseInt(document.getElementById('sizeSelect').value);
             undoStack = [];
             redoStack = [];
+            isGameFinished = false;
             generateRandomSolution();
             initGameUI();
             updateUndoRedoButtons();
@@ -761,7 +779,12 @@
                 }
                 if (!win) break;
             }
-            if (win) {
+            if (win && !isGameFinished) {
+                isGameFinished = true;
+                clearCount++;
+                localStorage.setItem('nemologic_clear_count', clearCount);
+                updateClearCountUI();
+
                 const msg = document.getElementById('message');
                 msg.textContent = "🎉 축하합니다! 정답입니다!";
                 msg.style.color = "var(--btn-success)";
@@ -1109,6 +1132,7 @@
         }
 
         initTheme();
+        updateClearCountUI();
         startNewGame();
     </script>
 </body>
