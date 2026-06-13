@@ -80,6 +80,7 @@
             margin: 0;
             padding: 20px;
             transition: background-color var(--transition-speed), color var(--transition-speed);
+            touch-action: manipulation;
         }
         
         .header-container {
@@ -480,6 +481,9 @@
         <button onclick="startNewGame()" class="primary-btn">새 게임 만들기</button>
     </div>
 
+    <!-- 상단 상시 고정 모드 표시 카드 (기존 크기와 디자인 유지) -->
+    <div id="modeDisplay" style="margin-bottom: 20px; font-size: 14px; text-align: center; padding: 10px 15px; border-radius: 8px; background-color: var(--container-bg); border: 1px solid var(--border-grid-sub); width: 100%; max-width: 480px; box-sizing: border-box; font-weight: 500; line-height: 1.5; transition: color var(--transition-speed);"></div>
+
     <div class="game-container">
         <div class="empty"></div>
         <div id="colHints" class="col-hints"></div>
@@ -493,7 +497,7 @@
         <button id="redoBtn" onclick="redo()" disabled>다시 실행</button>
         <button onclick="resetCurrentGame()">다시 칠하기</button>
     </div>
-    <p id="message"></p>
+    <p id="message" style="min-height: 20px; font-weight: bold; margin-top: 10px;"></p>
 
     <!-- 승리 모달 팝업 -->
     <div id="victoryModal" class="modal">
@@ -546,21 +550,316 @@
             }
         }
 
+        // --- 100% 논리적 풀이 검증기 (1번 모드용 Solver) ---
+        function getValidConfigurations(length, hints, currentLine) {
+            const configs = [];
+            let configCount = 0;
+            const maxConfigs = 1200;
+
+            function dfs(hintIdx, linePos, currentConfig) {
+                if (configCount > maxConfigs) return;
+                if (hintIdx === hints.length) {
+                    for (let i = linePos; i < length; i++) {
+                        if (currentLine[i] === 1) return;
+                        currentConfig[i] = 2;
+                    }
+                    configs.push([...currentConfig]);
+                    configCount++;
+                    return;
+                }
+
+                const currentHint = hints[hintIdx];
+                let minSpaceRequired = currentHint;
+                for (let k = hintIdx + 1; k < hints.length; k++) {
+                    minSpaceRequired += 1 + hints[k];
+                }
+
+                const maxStartPos = length - minSpaceRequired;
+                for (let start = linePos; start <= maxStartPos; start++) {
+                    if (start > linePos && currentLine[start - 1] === 1) break;
+
+                    let possible = true;
+                    for (let i = start; i < start + currentHint; i++) {
+                        if (currentLine[i] === 2) { possible = false; break; }
+                    }
+
+                    if (possible && start + currentHint < length && currentLine[start + currentHint] === 1) {
+                        possible = false;
+                    }
+
+                    if (possible) {
+                        const nextConfig = [...currentConfig];
+                        for (let i = linePos; i < start; i++) nextConfig[i] = 2;
+                        for (let i = start; i < start + currentHint; i++) nextConfig[i] = 1;
+                        let nextPos = start + currentHint;
+                        if (nextPos < length) { nextConfig[nextPos] = 2; nextPos++; }
+                        dfs(hintIdx + 1, nextPos, nextConfig);
+                    }
+
+                    if (currentLine[start] === 1) break;
+                }
+            }
+
+            dfs(0, 0, Array(length).fill(0));
+            return configCount > maxConfigs ? null : configs;
+        }
+
+        function solveLine(length, hints, currentLine) {
+            if (hints.length === 1 && hints[0] === 0) return Array(length).fill(2);
+            
+            const configs = getValidConfigurations(length, hints, currentLine);
+            if (!configs || configs.length === 0) return null;
+
+            const result = Array(length).fill(0);
+            for (let i = 0; i < length; i++) {
+                let allOne = true;
+                let allTwo = true;
+                for (let j = 0; j < configs.length; j++) {
+                    if (configs[j][i] !== 1) allOne = false;
+                    if (configs[j][i] !== 2) allTwo = false;
+                }
+                if (allOne) result[i] = 1;
+                else if (allTwo) result[i] = 2;
+            }
+            return result;
+        }
+
+        function isLogicallySolvable(size, solution) {
+            const rowHints = solution.map(row => getHints(row));
+            const colHints = Array(size).fill().map((_, c) => getHints(solution.map(row => row[c])));
+            const board = Array(size).fill().map(() => Array(size).fill(0));
+
+            let changed = true;
+            let iterations = 0;
+            const maxIterations = size * 3;
+
+            while (changed && iterations < maxIterations) {
+                changed = false;
+                iterations++;
+
+                for (let r = 0; r < size; r++) {
+                    const solved = solveLine(size, rowHints[r], board[r]);
+                    if (!solved) return false;
+                    for (let c = 0; c < size; c++) {
+                        if (board[r][c] === 0 && solved[c] !== 0) {
+                            board[r][c] = solved[c];
+                            changed = true;
+                        }
+                    }
+                }
+
+                for (let c = 0; c < size; c++) {
+                    const currentLine = board.map(row => row[c]);
+                    const solved = solveLine(size, colHints[c], currentLine);
+                    if (!solved) return false;
+                    for (let r = 0; r < size; r++) {
+                        if (board[r][c] === 0 && solved[r] !== 0) {
+                            board[r][c] = solved[r];
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (board[r][c] === 0) return false;
+                }
+            }
+            return true;
+        }
+
+        // --- 무작위 퍼즐 멀티 모드 상태 변수 ---
+        let activeGenerationMode = 0; 
+        let activeModeName = "";
+        let activeModeDesc = "";
+
         function startNewGame() {
             size = parseInt(document.getElementById('sizeSelect').value);
             undoStack = [];
             redoStack = [];
             isGameFinished = false;
-            generateRandomSolution();
-            initGameUI();
-            updateUndoRedoButtons();
-            document.getElementById('message').textContent = "";
+            
+            // 0~5 모드 중 무작위 선택
+            activeGenerationMode = Math.floor(Math.random() * 6);
+            
+            const modeEl = document.getElementById('modeDisplay');
+            const msg = document.getElementById('message');
+            modeEl.innerHTML = "⚙️ 지능형 퍼즐 생성 및 최적화 중...";
+            modeEl.style.color = "var(--text-secondary)";
+            msg.textContent = "";
+
+            setTimeout(() => {
+                generateRandomSolution();
+                initGameUI();
+                updateUndoRedoButtons();
+                
+                modeEl.innerHTML = `⚙️ <strong>${activeModeName}</strong><br><span style="font-size:12px;color:var(--text-muted);">${activeModeDesc}</span>`;
+                
+                // 모드별 포인트 색상 다채롭게 지정
+                if (activeGenerationMode === 0) modeEl.style.color = "var(--text-secondary)";
+                else if (activeGenerationMode === 1) modeEl.style.color = "var(--btn-bg)";
+                else if (activeGenerationMode === 2) modeEl.style.color = "#8b5cf6"; // 보라
+                else if (activeGenerationMode === 3) modeEl.style.color = "var(--btn-success)";
+                else if (activeGenerationMode === 4) modeEl.style.color = "#d97706"; // 주황
+                else if (activeGenerationMode === 5) modeEl.style.color = "#db2777"; // 핑크
+            }, 50);
         }
 
         function generateRandomSolution() {
-            solution = Array(size).fill().map(() => 
-                Array(size).fill().map(() => Math.random() > 0.4 ? 1 : 0)
-            );
+            if (activeGenerationMode === 0) {
+                // 0. 최초의 랜덤 방식 (밀도 60%)
+                activeModeName = "[기본 방식: 최초의 랜덤 방식]";
+                activeModeDesc = "스타터나 특수 규칙이 없는 순수 무작위 난수 맵입니다.";
+                solution = Array(size).fill().map(() => 
+                    Array(size).fill().map(() => Math.random() > 0.4 ? 1 : 0)
+                );
+            } 
+            else if (activeGenerationMode === 1) {
+                // 1. 100% 논리 풀이 보장 (No-Guessing)
+                activeModeName = "[1번 방식: 100% 논리 풀이 보장]";
+                activeModeDesc = "찍을 필요 없이 100% 논리적 유추만으로 해결 가능한 완성도 높은 맵입니다.";
+                
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.5 ? 1 : 0)
+                    );
+                    solvable = isLogicallySolvable(size, solution);
+                }
+            } 
+            else if (activeGenerationMode === 2) {
+                // 2. '뼈대와 구멍' 위주의 외곽선 배치 (뭉침 방지)
+                activeModeName = "[2번 방식: 외곽선 & 뼈대 방식]";
+                activeModeDesc = "뚱뚱한 사각형 블록을 억제하고 징검다리식 힌트가 고르게 흩어진 맵입니다.";
+                
+                solution = Array(size).fill().map(() => Array(size).fill(0));
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        let neighbors = 0;
+                        for (let dr = -1; dr <= 1; dr++) {
+                            for (let dc = -1; dc <= 1; dc++) {
+                                if (dr === 0 && dc === 0) continue;
+                                const nr = r + dr;
+                                const nc = c + dc;
+                                if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+                                    if (solution[nr][nc] === 1) neighbors++;
+                                }
+                            }
+                        }
+                        let prob = 0.45;
+                        if (neighbors >= 3) prob = 0.08; 
+                        solution[r][c] = Math.random() < prob ? 1 : 0;
+                    }
+                }
+                
+                // 연속 칠하기 한도 제한
+                const maxCon = Math.max(3, Math.floor(size * 0.5));
+                for (let r = 0; r < size; r++) {
+                    let con = 0;
+                    for (let c = 0; c < size; c++) {
+                        if (solution[r][c] === 1) {
+                            con++;
+                            if (con > maxCon) { solution[r][c] = 0; con = 0; }
+                        } else con = 0;
+                    }
+                }
+            } 
+            else if (activeGenerationMode === 3) {
+                // 3. 실타래 시작점 방식
+                activeModeName = "[3번 방식: 실타래 시작점 방식]";
+                activeModeDesc = "시작하기 쉬운 큼직한 가로/세로 스타터 힌트 1줄이 확실하게 보장됩니다.";
+                
+                solution = Array(size).fill().map(() => 
+                    Array(size).fill().map(() => Math.random() > 0.46 ? 1 : 0)
+                );
+                let minLen = 3, maxLen = 4;
+                if (size === 10) { minLen = 7; maxLen = 8; }
+                else if (size === 15) { minLen = 10; maxLen = 12; }
+                
+                const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                
+                const targetRow = Math.floor(Math.random() * size);
+                const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
+                for (let c = 0; c < size; c++) {
+                    solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                }
+                
+                const targetCol = Math.floor(Math.random() * size);
+                const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
+                for (let r = 0; r < size; r++) {
+                    if (r >= colStartPos && r < colStartPos + colLen) {
+                        solution[r][targetCol] = 1;
+                    } else {
+                        if (r !== targetRow) solution[r][targetCol] = 0;
+                    }
+                }
+            } 
+            else if (activeGenerationMode === 4) {
+                // 4. 최적의 밀도 밸런스
+                activeModeName = "[4번 방식: 최적 밀도 밸런스]";
+                activeModeDesc = "채움과 비움의 비율이 45% 내외로 조율되어 칠하는 즐거움이 가장 큽니다.";
+                
+                let inRange = false;
+                let attempts = 0;
+                while (!inRange && attempts < 100) {
+                    attempts++;
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.53 ? 1 : 0) 
+                    );
+                    const filledCount = solution.flat().filter(v => v === 1).length;
+                    const ratio = filledCount / (size * size);
+                    if (ratio >= 0.40 && ratio <= 0.50) {
+                        inRange = true;
+                    }
+                }
+            } 
+            else {
+                // 5. 예측 불가능한 도안의 반전 (기하학 대칭 패턴)
+                activeModeName = "[5번 방식: 기하학 대칭 방식]";
+                activeModeDesc = "기하학적 대칭 구조를 띠고 있어 사전에 뻔하게 짐작하기 힘든 퍼즐입니다.";
+                
+                const symType = Math.floor(Math.random() * 3); 
+                solution = Array(size).fill().map(() => Array(size).fill(0));
+                const density = 0.45;
+                
+                if (symType === 0) {
+                    const halfCols = Math.ceil(size / 2);
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < halfCols; c++) {
+                            const val = Math.random() < density ? 1 : 0;
+                            solution[r][c] = val;
+                            solution[r][size - 1 - c] = val;
+                        }
+                    }
+                } else if (symType === 1) {
+                    const halfRows = Math.ceil(size / 2);
+                    for (let r = 0; r < halfRows; r++) {
+                        for (let c = 0; c < size; c++) {
+                            const val = Math.random() < density ? 1 : 0;
+                            solution[r][c] = val;
+                            solution[size - 1 - r][c] = val;
+                        }
+                    }
+                } else {
+                    const halfRows = Math.ceil(size / 2);
+                    const halfCols = Math.ceil(size / 2);
+                    for (let r = 0; r < halfRows; r++) {
+                        for (let c = 0; c < halfCols; c++) {
+                            const val = Math.random() < density ? 1 : 0;
+                            solution[r][c] = val;
+                            solution[r][size - 1 - c] = val;
+                            solution[size - 1 - r][c] = val;
+                            solution[size - 1 - r][size - 1 - c] = val;
+                        }
+                    }
+                }
+            }
+            
+            // 빈 판 방지 예외 처리
             if (solution.flat().every(v => v === 0)) {
                 solution[Math.floor(Math.random()*size)][Math.floor(Math.random()*size)] = 1;
             }
