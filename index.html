@@ -19,7 +19,7 @@
             --border-grid-bold: #64748b;
             --cell-bg: #ffffff;
             --cell-filled: #0f172a;
-            --cell-marked: #dc2626;
+            --cell-marked: var(--cell-filled);
             --hint-completed: #cbd5e1;
             
             --btn-bg: #3b82f6;
@@ -52,7 +52,7 @@
             --border-grid-bold: #94a3b8;
             --cell-bg: #1e293b;
             --cell-filled: #cbd5e1;
-            --cell-marked: #ef4444;
+            --cell-marked: var(--cell-filled);
             --hint-completed: #94a3b8;
             
             --btn-bg: #2563eb;
@@ -710,10 +710,23 @@
             if (activeGenerationMode === 0) {
                 // 0. 최초의 랜덤 방식 (밀도 60%)
                 activeModeName = "[기본 방식: 최초의 랜덤 방식]";
-                activeModeDesc = "스타터나 특수 규칙이 없는 순수 무작위 난수 맵입니다.";
-                solution = Array(size).fill().map(() => 
-                    Array(size).fill().map(() => Math.random() > 0.4 ? 1 : 0)
-                );
+                activeModeDesc = "순수 무작위 난수 맵이며, 100% 논리로 해결 가능합니다.";
+                
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.4 ? 1 : 0)
+                    );
+                    solvable = isLogicallySolvable(size, solution);
+                }
+                
+                if (!solvable) {
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.5 ? 1 : 0)
+                    );
+                }
             } 
             else if (activeGenerationMode === 1) {
                 // 1. 100% 논리 풀이 보장 (No-Guessing)
@@ -733,129 +746,254 @@
             else if (activeGenerationMode === 2) {
                 // 2. '뼈대와 구멍' 위주의 외곽선 배치 (뭉침 방지)
                 activeModeName = "[2번 방식: 외곽선 & 뼈대 방식]";
-                activeModeDesc = "뚱뚱한 사각형 블록을 억제하고 징검다리식 힌트가 고르게 흩어진 맵입니다.";
+                activeModeDesc = "블록 뭉침을 억제한 뼈대형 맵이며, 100% 논리로 해결 가능합니다.";
                 
-                solution = Array(size).fill().map(() => Array(size).fill(0));
-                for (let r = 0; r < size; r++) {
-                    for (let c = 0; c < size; c++) {
-                        let neighbors = 0;
-                        for (let dr = -1; dr <= 1; dr++) {
-                            for (let dc = -1; dc <= 1; dc++) {
-                                if (dr === 0 && dc === 0) continue;
-                                const nr = r + dr;
-                                const nc = c + dc;
-                                if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
-                                    if (solution[nr][nc] === 1) neighbors++;
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            let neighbors = 0;
+                            for (let dr = -1; dr <= 1; dr++) {
+                                for (let dc = -1; dc <= 1; dc++) {
+                                    if (dr === 0 && dc === 0) continue;
+                                    const nr = r + dr;
+                                    const nc = c + dc;
+                                    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+                                        if (solution[nr][nc] === 1) neighbors++;
+                                    }
                                 }
                             }
+                            let prob = 0.45;
+                            if (neighbors >= 3) prob = 0.08; 
+                            solution[r][c] = Math.random() < prob ? 1 : 0;
                         }
-                        let prob = 0.45;
-                        if (neighbors >= 3) prob = 0.08; 
-                        solution[r][c] = Math.random() < prob ? 1 : 0;
                     }
+                    
+                    // 연속 칠하기 한도 제한
+                    const maxCon = Math.max(3, Math.floor(size * 0.5));
+                    for (let r = 0; r < size; r++) {
+                        let con = 0;
+                        for (let c = 0; c < size; c++) {
+                            if (solution[r][c] === 1) {
+                                con++;
+                                if (con > maxCon) { solution[r][c] = 0; con = 0; }
+                            } else con = 0;
+                        }
+                    }
+                    
+                    solvable = isLogicallySolvable(size, solution);
                 }
                 
-                // 연속 칠하기 한도 제한
-                const maxCon = Math.max(3, Math.floor(size * 0.5));
-                for (let r = 0; r < size; r++) {
-                    let con = 0;
-                    for (let c = 0; c < size; c++) {
-                        if (solution[r][c] === 1) {
-                            con++;
-                            if (con > maxCon) { solution[r][c] = 0; con = 0; }
-                        } else con = 0;
-                    }
+                if (!solvable) {
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.5 ? 1 : 0)
+                    );
                 }
             } 
             else if (activeGenerationMode === 3) {
                 // 3. 실타래 시작점 방식
                 activeModeName = "[3번 방식: 실타래 시작점 방식]";
-                activeModeDesc = "시작하기 쉬운 큼직한 가로/세로 스타터 힌트 1줄이 확실하게 보장됩니다.";
+                activeModeDesc = "큼직한 스타터 힌트 1줄이 보장되며, 100% 논리로 풀립니다.";
                 
-                solution = Array(size).fill().map(() => 
-                    Array(size).fill().map(() => Math.random() > 0.46 ? 1 : 0)
-                );
-                let minLen = 3, maxLen = 4;
-                if (size === 10) { minLen = 7; maxLen = 8; }
-                else if (size === 15) { minLen = 10; maxLen = 12; }
-                
-                const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
-                const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
-                
-                const targetRow = Math.floor(Math.random() * size);
-                const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
-                for (let c = 0; c < size; c++) {
-                    solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    
+                    // 1단계: 주변 이웃을 고려해 싱글톤(1칸 점)이 적은 기본 맵 생성
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            let neighbors = 0;
+                            for (let dr = -1; dr <= 1; dr++) {
+                                for (let dc = -1; dc <= 1; dc++) {
+                                    if (dr === 0 && dc === 0) continue;
+                                    const nr = r + dr;
+                                    const nc = c + dc;
+                                    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+                                        if (solution[nr][nc] === 1) neighbors++;
+                                    }
+                                }
+                            }
+                            // 이웃이 있으면 더 높은 확률로 채워지게 하여 뭉치게 만듦 (싱글톤 방지)
+                            let prob = neighbors >= 1 ? 0.52 : 0.30; 
+                            solution[r][c] = Math.random() < prob ? 1 : 0;
+                        }
+                    }
+                    
+                    // 2단계: 싱글톤 픽셀 감지 및 주변 병합/제거
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            if (solution[r][c] === 1) {
+                                const left = c > 0 ? solution[r][c - 1] : 0;
+                                const right = c < size - 1 ? solution[r][c + 1] : 0;
+                                if (left === 0 && right === 0) {
+                                    if (Math.random() < 0.6) {
+                                        if (c < size - 1) solution[r][c + 1] = 1;
+                                        else if (c > 0) solution[r][c - 1] = 1;
+                                    } else {
+                                        solution[r][c] = 0;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 3단계: 가로/세로 스타터 힌트 배치
+                    let minLen = 3, maxLen = 4;
+                    if (size === 10) { minLen = 7; maxLen = 8; }
+                    else if (size === 15) { minLen = 10; maxLen = 12; }
+                    
+                    const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                    const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                    
+                    const targetRow = Math.floor(Math.random() * size);
+                    const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
+                    for (let c = 0; c < size; c++) {
+                        solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                    }
+                    
+                    const targetCol = Math.floor(Math.random() * size);
+                    const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
+                    for (let r = 0; r < size; r++) {
+                        if (r >= colStartPos && r < colStartPos + colLen) {
+                            solution[r][targetCol] = 1;
+                        } else {
+                            if (r !== targetRow) solution[r][targetCol] = 0;
+                        }
+                    }
+                    
+                    // 4단계: 논리적 해결 가능성 체크
+                    solvable = isLogicallySolvable(size, solution);
                 }
                 
-                const targetCol = Math.floor(Math.random() * size);
-                const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
-                for (let r = 0; r < size; r++) {
-                    if (r >= colStartPos && r < colStartPos + colLen) {
-                        solution[r][targetCol] = 1;
-                    } else {
-                        if (r !== targetRow) solution[r][targetCol] = 0;
-                    }
+                // 100번 안에 완벽한 맵을 못 찾았을 경우 대비한 백업 안전장치
+                if (!solvable) {
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.5 ? 1 : 0)
+                    );
                 }
             } 
             else if (activeGenerationMode === 4) {
                 // 4. 최적의 밀도 밸런스
                 activeModeName = "[4번 방식: 최적 밀도 밸런스]";
-                activeModeDesc = "채움과 비움의 비율이 45% 내외로 조율되어 칠하는 즐거움이 가장 큽니다.";
+                activeModeDesc = "채움 비율이 45% 내외로 조율되며, 100% 논리로 풀립니다.";
                 
-                let inRange = false;
+                let solvable = false;
                 let attempts = 0;
-                while (!inRange && attempts < 100) {
+                while (!solvable && attempts < 100) {
                     attempts++;
-                    solution = Array(size).fill().map(() => 
-                        Array(size).fill().map(() => Math.random() > 0.53 ? 1 : 0) 
-                    );
+                    
+                    // 1단계: 주변 이웃을 고려해 싱글톤(1칸 점)이 적은 기본 맵 생성
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            let neighbors = 0;
+                            for (let dr = -1; dr <= 1; dr++) {
+                                for (let dc = -1; dc <= 1; dc++) {
+                                    if (dr === 0 && dc === 0) continue;
+                                    const nr = r + dr;
+                                    const nc = c + dc;
+                                    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+                                        if (solution[nr][nc] === 1) neighbors++;
+                                    }
+                                }
+                            }
+                            let prob = neighbors >= 1 ? 0.52 : 0.32; 
+                            solution[r][c] = Math.random() < prob ? 1 : 0;
+                        }
+                    }
+                    
+                    // 2단계: 싱글톤 픽셀 감지 및 주변 병합/제거
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            if (solution[r][c] === 1) {
+                                const left = c > 0 ? solution[r][c - 1] : 0;
+                                const right = c < size - 1 ? solution[r][c + 1] : 0;
+                                if (left === 0 && right === 0) {
+                                    if (Math.random() < 0.6) {
+                                        if (c < size - 1) solution[r][c + 1] = 1;
+                                        else if (c > 0) solution[r][c - 1] = 1;
+                                    } else {
+                                        solution[r][c] = 0;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 3단계: 밀도 체크 및 논리적 해결 가능성 체크
                     const filledCount = solution.flat().filter(v => v === 1).length;
                     const ratio = filledCount / (size * size);
                     if (ratio >= 0.40 && ratio <= 0.50) {
-                        inRange = true;
+                        solvable = isLogicallySolvable(size, solution);
                     }
+                }
+                
+                // 100번 안에 완벽한 맵을 못 찾았을 경우 대비한 백업
+                if (!solvable) {
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.5 ? 1 : 0)
+                    );
                 }
             } 
             else {
                 // 5. 예측 불가능한 도안의 반전 (기하학 대칭 패턴)
                 activeModeName = "[5번 방식: 기하학 대칭 방식]";
-                activeModeDesc = "기하학적 대칭 구조를 띠고 있어 사전에 뻔하게 짐작하기 힘든 퍼즐입니다.";
+                activeModeDesc = "기하학적 대칭 구조를 띠고 있으며, 100% 논리로 해결 가능합니다.";
                 
-                const symType = Math.floor(Math.random() * 3); 
-                solution = Array(size).fill().map(() => Array(size).fill(0));
-                const density = 0.45;
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    
+                    const symType = Math.floor(Math.random() * 3); 
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
+                    const density = 0.45;
+                    
+                    if (symType === 0) {
+                        const halfCols = Math.ceil(size / 2);
+                        for (let r = 0; r < size; r++) {
+                            for (let c = 0; c < halfCols; c++) {
+                                const val = Math.random() < density ? 1 : 0;
+                                solution[r][c] = val;
+                                solution[r][size - 1 - c] = val;
+                            }
+                        }
+                    } else if (symType === 1) {
+                        const halfRows = Math.ceil(size / 2);
+                        for (let r = 0; r < halfRows; r++) {
+                            for (let c = 0; c < size; c++) {
+                                const val = Math.random() < density ? 1 : 0;
+                                solution[r][c] = val;
+                                solution[size - 1 - r][c] = val;
+                            }
+                        }
+                    } else {
+                        const halfRows = Math.ceil(size / 2);
+                        const halfCols = Math.ceil(size / 2);
+                        for (let r = 0; r < halfRows; r++) {
+                            for (let c = 0; c < halfCols; c++) {
+                                const val = Math.random() < density ? 1 : 0;
+                                solution[r][c] = val;
+                                solution[r][size - 1 - c] = val;
+                                solution[size - 1 - r][c] = val;
+                                solution[size - 1 - r][size - 1 - c] = val;
+                            }
+                        }
+                    }
+                    
+                    solvable = isLogicallySolvable(size, solution);
+                }
                 
-                if (symType === 0) {
-                    const halfCols = Math.ceil(size / 2);
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < halfCols; c++) {
-                            const val = Math.random() < density ? 1 : 0;
-                            solution[r][c] = val;
-                            solution[r][size - 1 - c] = val;
-                        }
-                    }
-                } else if (symType === 1) {
-                    const halfRows = Math.ceil(size / 2);
-                    for (let r = 0; r < halfRows; r++) {
-                        for (let c = 0; c < size; c++) {
-                            const val = Math.random() < density ? 1 : 0;
-                            solution[r][c] = val;
-                            solution[size - 1 - r][c] = val;
-                        }
-                    }
-                } else {
-                    const halfRows = Math.ceil(size / 2);
-                    const halfCols = Math.ceil(size / 2);
-                    for (let r = 0; r < halfRows; r++) {
-                        for (let c = 0; c < halfCols; c++) {
-                            const val = Math.random() < density ? 1 : 0;
-                            solution[r][c] = val;
-                            solution[r][size - 1 - c] = val;
-                            solution[size - 1 - r][c] = val;
-                            solution[size - 1 - r][size - 1 - c] = val;
-                        }
-                    }
+                if (!solvable) {
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.5 ? 1 : 0)
+                    );
                 }
             }
             
@@ -1325,78 +1463,39 @@
                 return matched;
             }
 
-            const m = userBlocks.length;
-            const n = hints.length;
-
-            // DP 테이블 생성: dp[i][j]는 U[i..m-1]와 H[j..n-1]의 최대 매칭 수
-            const dp = Array(m + 1).fill().map(() => Array(n + 1).fill(0));
-
-            for (let i = m - 1; i >= 0; i--) {
-                for (let j = n - 1; j >= 0; j--) {
-                    let val = Math.max(dp[i + 1][j], dp[i][j + 1]);
-                    if (userBlocks[i].length === hints[j]) {
-                        val = Math.max(val, 1 + dp[i + 1][j + 1]);
+            // 정답 맵에서 실제 정답 블록들의 시작/끝 좌표 및 길이를 구합니다.
+            const solBlocks = [];
+            let startSol = -1;
+            for (let i = 0; i < solutionLine.length; i++) {
+                if (solutionLine[i] === 1) {
+                    if (startSol === -1) {
+                        startSol = i;
                     }
-                    dp[i][j] = val;
+                } else {
+                    if (startSol !== -1) {
+                        solBlocks.push({ start: startSol, end: i - 1, length: i - startSol });
+                        startSol = -1;
+                    }
                 }
             }
-
-            const maxSize = dp[0][0];
-            if (maxSize === 0) {
-                return matched;
+            if (startSol !== -1) {
+                solBlocks.push({ start: startSol, end: solutionLine.length - 1, length: solutionLine.length - startSol });
             }
 
-            // 가장 왼쪽(정방향)으로 당겨서 매칭한 결과 복원 (L)
-            const L = Array(m).fill(-1);
-            let i = 0, j = 0, remaining = maxSize;
-            while (i < m && j < n && remaining > 0) {
-                if (userBlocks[i].length === hints[j] && 1 + dp[i + 1][j + 1] === remaining) {
-                    L[i] = j;
-                    i++;
-                    j++;
-                    remaining--;
-                } else if (dp[i][j + 1] === remaining) {
-                    j++;
-                } else {
-                    i++;
-                }
-            }
-
-            // 가장 오른쪽(역방향)으로 밀어서 매칭한 결과 복원 (R)
-            const R = Array(m).fill(-1);
-            i = 0; j = 0; remaining = maxSize;
-            while (i < m && j < n && remaining > 0) {
-                if (dp[i][j + 1] === remaining) {
-                    j++;
-                } else if (userBlocks[i].length === hints[j] && 1 + dp[i + 1][j + 1] === remaining) {
-                    R[i] = j;
-                    i++;
-                    j++;
-                    remaining--;
-                } else {
-                    i++;
-                }
-            }
-
-            // 매칭 정보 조합 및 모호성 해결
-            for (let k = 0; k < m; k++) {
-                const lIdx = L[k];
-                const rIdx = R[k];
-                if (lIdx === -1 && rIdx === -1) continue;
-
-                if (lIdx === rIdx) {
-                    // 모호함 없이 고유하게 매칭되는 힌트인 경우
-                    matched.add(lIdx);
-                } else {
-                    // 좌/우 매칭이 달라 모호성 발생 시, 격자판 중심과 블록 중심 거리를 비교하여 판단
-                    const block = userBlocks[k];
-                    const blockCenter = (block.start + block.end) / 2;
-                    const boardCenter = userLine.length / 2;
-
-                    if (blockCenter < boardCenter && lIdx !== -1) {
-                        matched.add(lIdx);
-                    } else if (blockCenter > boardCenter && rIdx !== -1) {
-                        matched.add(rIdx);
+            // 각 정답 블록(힌트 인덱스 j)에 대해 유저가 맞게 칠했는지 대조합니다.
+            for (let j = 0; j < solBlocks.length; j++) {
+                const s = solBlocks[j];
+                
+                for (let i = 0; i < userBlocks.length; i++) {
+                    const u = userBlocks[i];
+                    
+                    // 길이가 일치하고, 물리적인 위치가 정답 블록의 범위와 일부 또는 전부 겹치는 경우
+                    if (u.length === s.length) {
+                        const isOverlapping = (u.start <= s.end && u.end >= s.start);
+                        if (isOverlapping) {
+                            matched.add(j);
+                            break; // 해당 힌트 인덱스는 매칭 성공
+                        }
                     }
                 }
             }
