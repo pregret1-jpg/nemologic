@@ -1634,6 +1634,37 @@
             checkAnswer();
         }
 
+        function getClueBounds(length, hints) {
+            const bounds = [];
+            const n = hints.length;
+            if (n === 0 || (n === 1 && hints[0] === 0)) return [];
+
+            // 1. 최소 시작 위치 (Min Start) 계산
+            const minStarts = Array(n).fill(0);
+            let currentMin = 0;
+            for (let i = 0; i < n; i++) {
+                minStarts[i] = currentMin;
+                currentMin += hints[i] + 1; // 블록 길이 + 간격 1칸
+            }
+
+            // 2. 최대 끝 위치 (Max End) 계산
+            const maxEnds = Array(n).fill(0);
+            let currentMax = length;
+            for (let i = n - 1; i >= 0; i--) {
+                maxEnds[i] = currentMax - 1;
+                currentMax -= hints[i] + 1; // 블록 길이 + 간격 1칸
+            }
+
+            for (let i = 0; i < n; i++) {
+                bounds.push({
+                    start: minStarts[i],
+                    end: maxEnds[i],
+                    length: hints[i]
+                });
+            }
+            return bounds;
+        }
+
         function getMatchedHintIndicesUser(solutionLine, userLine) {
             const hints = getHints(solutionLine);
             const userBlocks = [];
@@ -1666,18 +1697,43 @@
                 return matched;
             }
 
-            // 정답과 무관하게, 순수하게 왼쪽(정방향)부터 차례대로 매칭하는 그리디 알고리즘
-            let hintIdx = 0;
-            for (let uIdx = 0; uIdx < userBlocks.length; uIdx++) {
-                const uLength = userBlocks[uIdx].length;
-                
-                while (hintIdx < hints.length) {
-                    if (hints[hintIdx] === uLength) {
-                        matched.add(hintIdx);
-                        hintIdx++; // 매칭 성공했으므로 다음 힌트부터 탐색
-                        break;
+            // 1단계: 각 힌트의 수학적 물리 가용 범위(Bounds) 계산
+            const bounds = getClueBounds(userLine.length, hints);
+
+            // 2단계: DP를 이용한 순서 보존 최대 매칭
+            const N = bounds.length;
+            const M = userBlocks.length;
+            
+            const dp = Array.from({ length: N + 1 }, () => Array(M + 1).fill(0));
+            
+            function canMatch(j, i) {
+                const b = bounds[j];
+                const u = userBlocks[i];
+                return u.length === b.length && u.start >= b.start && u.end <= b.end;
+            }
+            
+            for (let j = 1; j <= N; j++) {
+                for (let i = 1; i <= M; i++) {
+                    let val = Math.max(dp[j-1][i], dp[j][i-1]);
+                    if (canMatch(j - 1, i - 1)) {
+                        val = Math.max(val, dp[j-1][i-1] + 1);
                     }
-                    hintIdx++;
+                    dp[j][i] = val;
+                }
+            }
+            
+            // 3단계: 역추적(Backtracking)하여 매칭된 j(힌트 인덱스) 찾기
+            let j = N;
+            let i = M;
+            while (j > 0 && i > 0) {
+                if (canMatch(j - 1, i - 1) && dp[j][i] === dp[j-1][i-1] + 1) {
+                    matched.add(j - 1);
+                    j--;
+                    i--;
+                } else if (dp[j][i] === dp[j-1][i]) {
+                    j--;
+                } else {
+                    i--;
                 }
             }
 
