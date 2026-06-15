@@ -703,6 +703,8 @@
                 else if (activeGenerationMode === 3) modeEl.style.color = "var(--btn-success)";
                 else if (activeGenerationMode === 4) modeEl.style.color = "#d97706"; // 주황
                 else if (activeGenerationMode === 5) modeEl.style.color = "#db2777"; // 핑크
+                
+                saveGameProgress();
             }, 50);
         }
 
@@ -1003,8 +1005,10 @@
             }
         }
 
-        function initGameUI() {
-            userGrid = Array(size).fill().map(() => Array(size).fill(0));
+        function initGameUI(isRestore = false) {
+            if (!isRestore) {
+                userGrid = Array(size).fill().map(() => Array(size).fill(0));
+            }
             
             const grid = document.getElementById('grid');
             const rowHints = document.getElementById('rowHints');
@@ -1162,6 +1166,8 @@
                     undoStack.pop();
                     updateUndoRedoButtons();
                 }
+                
+                saveGameProgress();
             }
         };
         window.onmouseup = stopDragging;
@@ -1226,6 +1232,7 @@
                 msg.textContent = "🎉 축하합니다! 정답입니다!";
                 msg.style.color = "var(--btn-success)";
                 showModal();
+                saveGameProgress();
             }
         }
 
@@ -1261,6 +1268,7 @@
             userGrid = Array(size).fill().map(() => Array(size).fill(0));
             document.getElementById('message').textContent = "";
             updateHintStyles();
+            saveGameProgress();
         }
 
         // Undo/Redo 관련 핵심 함수들
@@ -1268,6 +1276,7 @@
             undoStack.push(userGrid.map(row => [...row]));
             redoStack = [];
             updateUndoRedoButtons();
+            saveGameProgress();
         }
 
         function undo() {
@@ -1289,6 +1298,101 @@
             syncGridToUI();
             updateUndoRedoButtons();
             updateHintStyles();
+            saveGameProgress();
+        }
+
+        // 진행 상황 자동 저장 및 불러오기 함수
+        function saveGameProgress() {
+            if (isGameFinished) {
+                localStorage.removeItem('nemologic_saved_game');
+                return;
+            }
+            try {
+                const progress = {
+                    size: size,
+                    activeGenerationMode: activeGenerationMode,
+                    activeModeName: activeModeName,
+                    activeModeDesc: activeModeDesc,
+                    solution: solution,
+                    userGrid: userGrid,
+                    isGameFinished: isGameFinished,
+                    undoStack: undoStack,
+                    redoStack: redoStack
+                };
+                localStorage.setItem('nemologic_saved_game', JSON.stringify(progress));
+            } catch (e) {
+                console.error("진행 상황 저장 실패:", e);
+            }
+        }
+
+        function loadGameProgress() {
+            const savedData = localStorage.getItem('nemologic_saved_game');
+            if (savedData) {
+                try {
+                    const progress = JSON.parse(savedData);
+                    
+                    if (progress && progress.solution && progress.userGrid && progress.size) {
+                        size = progress.size;
+                        solution = progress.solution;
+                        userGrid = progress.userGrid;
+                        activeGenerationMode = progress.activeGenerationMode;
+                        activeModeName = progress.activeModeName;
+                        activeModeDesc = progress.activeModeDesc;
+                        isGameFinished = progress.isGameFinished || false;
+                        undoStack = progress.undoStack || [];
+                        redoStack = progress.redoStack || [];
+                        
+                        const sizeSelect = document.getElementById('sizeSelect');
+                        if (sizeSelect) {
+                            sizeSelect.value = size;
+                        }
+                        
+                        initGameUI(true);
+                        
+                        // 로딩된 그리드 상태 반영
+                        for (let r = 0; r < size; r++) {
+                            for (let c = 0; c < size; c++) {
+                                const cell = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+                                if (cell) {
+                                    if (userGrid[r][c] === 1) {
+                                        cell.classList.add('filled');
+                                    } else if (userGrid[r][c] === 2) {
+                                        cell.classList.add('marked');
+                                    }
+                                }
+                            }
+                        }
+                        
+                        updateHintStyles();
+                        updateUndoRedoButtons();
+                        
+                        const modeEl = document.getElementById('modeDisplay');
+                        modeEl.innerHTML = `⚙️ <strong>${activeModeName}</strong><br><span style="font-size:12px;color:var(--text-muted);">${activeModeDesc}</span>`;
+                        if (activeGenerationMode === 0) modeEl.style.color = "var(--text-secondary)";
+                        else if (activeGenerationMode === 1) modeEl.style.color = "var(--btn-bg)";
+                        else if (activeGenerationMode === 2) modeEl.style.color = "#8b5cf6";
+                        else if (activeGenerationMode === 3) modeEl.style.color = "var(--btn-success)";
+                        else if (activeGenerationMode === 4) modeEl.style.color = "#d97706";
+                        else if (activeGenerationMode === 5) modeEl.style.color = "#db2777";
+                        
+                        const msg = document.getElementById('message');
+                        if (msg) {
+                            msg.textContent = "💾 이전 진행 상황을 자동으로 불러왔습니다.";
+                            msg.style.color = "var(--text-muted)";
+                            setTimeout(() => {
+                                if (msg.textContent === "💾 이전 진행 상황을 자동으로 불러왔습니다.") {
+                                    msg.textContent = "";
+                                }
+                            }, 3000);
+                        }
+                        return true;
+                    }
+                } catch (e) {
+                    console.error("진행 상황 복구 실패:", e);
+                    localStorage.removeItem('nemologic_saved_game');
+                }
+            }
+            return false;
         }
 
         function syncGridToUI() {
@@ -1531,7 +1635,9 @@
 
         initTheme();
         updateClearCountUI();
-        startNewGame();
+        if (!loadGameProgress()) {
+            startNewGame();
+        }
     </script>
 </body>
 </html>
