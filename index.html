@@ -26,6 +26,8 @@
             --btn-hover: #2563eb;
             --btn-success: #10b981;
             --btn-success-hover: #059669;
+            --btn-danger: #ef4444;
+            --btn-danger-hover: #dc2626;
             --btn-disabled: #cbd5e1;
             --btn-disabled-text: #94a3b8;
             
@@ -59,6 +61,8 @@
             --btn-hover: #1d4ed8;
             --btn-success: #059669;
             --btn-success-hover: #047857;
+            --btn-danger: #dc2626;
+            --btn-danger-hover: #b91c1c;
             --btn-disabled: #334155;
             --btn-disabled-text: #64748b;
             
@@ -304,10 +308,10 @@
             background-color: var(--btn-success-hover);
         }
         button.tool-btn.mark-mode {
-            background-color: var(--cell-marked); /* Red for X */
+            background-color: var(--btn-danger); /* Red for X */
         }
         button.tool-btn.mark-mode:hover:not(:disabled) {
-            background-color: #dc2626;
+            background-color: var(--btn-danger-hover);
         }
         #message {
             margin-top: 15px;
