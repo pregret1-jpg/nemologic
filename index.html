@@ -684,8 +684,8 @@
             redoStack = [];
             isGameFinished = false;
             
-            // 0~4 모드 중 무작위 선택
-            activeGenerationMode = Math.floor(Math.random() * 5);
+            // 0~5 모드 중 무작위 선택
+            activeGenerationMode = Math.floor(Math.random() * 6);
             
             const modeEl = document.getElementById('modeDisplay');
             const msg = document.getElementById('message');
@@ -702,10 +702,11 @@
                 
                 // 모드별 포인트 색상 다채롭게 지정
                 if (activeGenerationMode === 0) modeEl.style.color = "var(--text-secondary)";
-                else if (activeGenerationMode === 1) modeEl.style.color = "#8b5cf6"; // 보라
-                else if (activeGenerationMode === 2) modeEl.style.color = "var(--btn-success)"; // 초록
-                else if (activeGenerationMode === 3) modeEl.style.color = "#d97706"; // 주황
-                else if (activeGenerationMode === 4) modeEl.style.color = "#db2777"; // 핑크
+                else if (activeGenerationMode === 1) modeEl.style.color = "var(--btn-bg)";
+                else if (activeGenerationMode === 2) modeEl.style.color = "#8b5cf6"; // 보라
+                else if (activeGenerationMode === 3) modeEl.style.color = "var(--btn-success)"; // 초록
+                else if (activeGenerationMode === 4) modeEl.style.color = "#d97706"; // 주황
+                else if (activeGenerationMode === 5) modeEl.style.color = "#db2777"; // 핑크
                 
                 saveGameProgress();
             }, 50);
@@ -713,9 +714,6 @@
 
         // --- 100% 풀이 보장 백업용 동적 무작위 생성 대체 함수 ---
         function fallbackToBasicSolvable() {
-            activeModeName = "[기본 방식: 100% 논리 풀이 보장 (백업)]";
-            activeModeDesc = "지능형 생성이 해제되어, 무작위로 자동 생성된 100% 논리 해결 가능 퍼즐입니다.";
-            
             let solvable = false;
             while (!solvable) {
                 solution = Array(size).fill().map(() => 
@@ -746,8 +744,27 @@
                 }
             } 
             else if (activeGenerationMode === 1) {
-                // 1. '뼈대와 구멍' 위주의 외곽선 배치 (뭉침 방지)
-                activeModeName = "[1번 방식: 외곽선 & 뼈대 방식]";
+                // 1. 100% 논리 풀이 보장 (No-Guessing)
+                activeModeName = "[1번 방식: 100% 논리 풀이 보장]";
+                activeModeDesc = "찍을 필요 없이 100% 논리적 유추만으로 해결 가능한 완성도 높은 맵입니다.";
+                
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    solution = Array(size).fill().map(() => 
+                        Array(size).fill().map(() => Math.random() > 0.5 ? 1 : 0)
+                    );
+                    solvable = isLogicallySolvable(size, solution);
+                }
+                
+                if (!solvable) {
+                    fallbackToBasicSolvable();
+                }
+            } 
+            else if (activeGenerationMode === 2) {
+                // 2. '뼈대와 구멍' 위주의 외곽선 배치 (뭉침 방지)
+                activeModeName = "[2번 방식: 외곽선 & 뼈대 방식]";
                 activeModeDesc = "블록 뭉침을 억제한 뼈대형 맵이며, 100% 논리로 해결 가능합니다.";
                 
                 let solvable = false;
@@ -794,9 +811,9 @@
                     fallbackToBasicSolvable();
                 }
             } 
-            else if (activeGenerationMode === 2) {
-                // 2. 실타래 시작점 방식
-                activeModeName = "[2번 방식: 실타래 시작점 방식]";
+            else if (activeGenerationMode === 3) {
+                // 3. 실타래 시작점 방식
+                activeModeName = "[3번 방식: 실타래 시작점 방식]";
                 activeModeDesc = "큼직한 스타터 힌트 1줄이 보장되며, 100% 논리로 풀립니다.";
                 
                 let solvable = false;
@@ -876,9 +893,9 @@
                     fallbackToBasicSolvable();
                 }
             } 
-            else if (activeGenerationMode === 3) {
-                // 3. 최적의 밀도 밸런스
-                activeModeName = "[3번 방식: 최적 밀도 밸런스]";
+            else if (activeGenerationMode === 4) {
+                // 4. 최적의 밀도 밸런스
+                activeModeName = "[4번 방식: 최적 밀도 밸런스]";
                 activeModeDesc = "채움 비율이 45% 내외로 조율되며, 100% 논리로 풀립니다.";
                 
                 let solvable = false;
@@ -938,8 +955,8 @@
                 }
             } 
             else {
-                // 4. 예측 불가능한 도안의 반전 (기하학 대칭 패턴)
-                activeModeName = "[4번 방식: 기하학 대칭 방식]";
+                // 5. 예측 불가능한 도안의 반전 (기하학 대칭 패턴)
+                activeModeName = "[5번 방식: 기하학 대칭 방식]";
                 activeModeDesc = "기하학적 대칭 구조를 띠고 있으며, 100% 논리로 해결 가능합니다.";
                 
                 let solvable = false;
@@ -1361,10 +1378,11 @@
                         const modeEl = document.getElementById('modeDisplay');
                         modeEl.innerHTML = `⚙️ <strong>${activeModeName}</strong><br><span style="font-size:12px;color:var(--text-muted);">${activeModeDesc}</span>`;
                         if (activeGenerationMode === 0) modeEl.style.color = "var(--text-secondary)";
-                        else if (activeGenerationMode === 1) modeEl.style.color = "#8b5cf6";
-                        else if (activeGenerationMode === 2) modeEl.style.color = "var(--btn-success)";
-                        else if (activeGenerationMode === 3) modeEl.style.color = "#d97706";
-                        else if (activeGenerationMode === 4) modeEl.style.color = "#db2777";
+                        else if (activeGenerationMode === 1) modeEl.style.color = "var(--btn-bg)";
+                        else if (activeGenerationMode === 2) modeEl.style.color = "#8b5cf6";
+                        else if (activeGenerationMode === 3) modeEl.style.color = "var(--btn-success)";
+                        else if (activeGenerationMode === 4) modeEl.style.color = "#d97706";
+                        else if (activeGenerationMode === 5) modeEl.style.color = "#db2777";
                         
                         const msg = document.getElementById('message');
                         if (msg) {
