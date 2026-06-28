@@ -804,6 +804,30 @@
                         }
                     }
                     
+                    // --- 추가: 난이도 완화를 위한 가로/세로 스타터 힌트 강제 적용 ---
+                    let minLen = 3, maxLen = 4;
+                    if (size === 10) { minLen = 7; maxLen = 8; }
+                    else if (size === 15) { minLen = 10; maxLen = 12; }
+                    
+                    const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                    const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                    
+                    const targetRow = Math.floor(Math.random() * size);
+                    const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
+                    for (let c = 0; c < size; c++) {
+                        solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                    }
+                    
+                    const targetCol = Math.floor(Math.random() * size);
+                    const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
+                    for (let r = 0; r < size; r++) {
+                        if (r >= colStartPos && r < colStartPos + colLen) {
+                            solution[r][targetCol] = 1;
+                        } else {
+                            if (r !== targetRow) solution[r][targetCol] = 0;
+                        }
+                    }
+                    
                     solvable = isLogicallySolvable(size, solution);
                 }
                 
