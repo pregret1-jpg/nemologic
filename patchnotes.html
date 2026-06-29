@@ -228,17 +228,41 @@
 
     <div class="container">
         <header>
-            <div class="version-badge">PATCH v1.4.0</div>
+            <div class="version-badge">PATCH v1.4.1</div>
             <h1>대중소 네모로직 패치노트</h1>
-            <div class="patch-date">2026.06.15 • 15X15 SOLVER & HINT MATCHING UPDATE</div>
+            <div class="patch-date">2026.06.29 • DIFFICULTY BALANCE & DE-FRAGMENTATION UPDATE</div>
         </header>
 
         <main class="card">
             <p class="intro-text">
-                15x15 대형 퍼즐에서 간혹 발생하던 풀 수 없는 스테이지 문제를 완벽히 해결하고, 사용자가 칠한 칸들의 물리적 순서와 규칙을 고려하여 힌트 완료 표시가 더욱 정교하고 논리적으로 표시되도록 개선한 핵심 알고리즘 고도화 업데이트입니다.
+                사용자의 선택에 따라 퍼즐 생성 1~4번 모드의 난이도를 하향 조정하고, 퍼즐이 너무 복잡하게 쪼개져 피로감을 유도하던 파편화 현상을 완화하여 더 직관적이고 경쾌한 플레이가 가능하도록 조율한 알고리즘 업데이트입니다.
             </p>
 
-            <h2>v1.4.0 신규 업데이트 사항</h2>
+            <h2>v1.4.1 신규 업데이트 사항</h2>
+            
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="feature-title">
+                        <span>🚀</span> 1. 2열 2행 스타터 힌트 기본 제공 (1~4번 모드 전체 적용)
+                    </div>
+                    <div class="feature-desc">
+                        기존에 스타터 힌트가 아예 없거나 1줄만 보장되던 1~4번 생성 방식에 **가로 2줄, 세로 2줄의 대형 스타터 블록**을 기본적으로 보장 주입합니다. 이에 따라 게임 시작 시 확정적으로 칠할 수 있는 영역이 크게 늘어나 첫 실마리를 푸는 난이도가 비약적으로 하향되었습니다.
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-title">
+                        <span>🧩</span> 2. 힌트 파편화 방지 및 셀 연속성 상향
+                    </div>
+                    <div class="feature-desc">
+                        자잘한 1칸짜리 힌트(예: 1 1 1 1)들이 지나치게 흩뿌려지는 것을 막기 위해 난수 생성기의 연속성 가중치를 높이고, 외톨이 점(1x1)을 자동으로 주변 블록에 병합하거나 제거하는 필터링을 고도화했습니다. 또한 뼈대 방식의 연속 제한 한도를 늘려 큼직하고 재미있는 형태가 더 자주 생성됩니다.
+                    </div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <h2>v1.4.0 이전 업데이트 사항</h2>
             
             <div class="feature-list">
                 <div class="feature-item">
