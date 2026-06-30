@@ -745,8 +745,14 @@
             } 
             else if (activeGenerationMode === 1) {
                 // 1. 100% 논리 풀이 보장 (No-Guessing)
-                activeModeName = "[1번 방식: 100% 논리 풀이 보장]";
-                activeModeDesc = "큼직한 스타터 힌트 2줄이 보장되어 한결 쉬워진 100% 논리적 맵입니다.";
+                const useTwoStarters = Math.random() < 0.5;
+                if (useTwoStarters) {
+                    activeModeName = "[1번 방식: 100% 논리 풀이 보장] (쉬움)";
+                    activeModeDesc = "큼직한 스타터 힌트 2줄이 보장되어 한결 쉬워진 100% 논리적 맵입니다.";
+                } else {
+                    activeModeName = "[1번 방식: 100% 논리 풀이 보장] (보통)";
+                    activeModeDesc = "가로/세로 1줄의 스타터 힌트가 보장되어 적절한 난이도를 지닌 100% 논리적 맵입니다.";
+                }
                 
                 let solvable = false;
                 let attempts = 0;
@@ -784,42 +790,68 @@
                         }
                     }
 
-                    // 가로/세로 스타터 힌트 강제 적용 (가로 2줄, 세로 2줄)
-                    let minLen = 3, maxLen = 4;
-                    if (size === 10) { minLen = 7; maxLen = 9; }
-                    else if (size === 15) { minLen = 11; maxLen = 13; }
-                    
-                    let targetRows = [];
-                    while (targetRows.length < 2) {
-                        let r = Math.floor(Math.random() * size);
-                        if (!targetRows.includes(r)) targetRows.push(r);
-                    }
-                    
-                    let targetCols = [];
-                    while (targetCols.length < 2) {
-                        let c = Math.floor(Math.random() * size);
-                        if (!targetCols.includes(c)) targetCols.push(c);
-                    }
-                    
-                    targetRows.forEach(tr => {
+                    if (useTwoStarters) {
+                        // 가로/세로 스타터 힌트 강제 적용 (가로 2줄, 세로 2줄)
+                        let minLen = 3, maxLen = 4;
+                        if (size === 10) { minLen = 7; maxLen = 9; }
+                        else if (size === 15) { minLen = 11; maxLen = 13; }
+                        
+                        let targetRows = [];
+                        while (targetRows.length < 2) {
+                            let r = Math.floor(Math.random() * size);
+                            if (!targetRows.includes(r)) targetRows.push(r);
+                        }
+                        
+                        let targetCols = [];
+                        while (targetCols.length < 2) {
+                            let c = Math.floor(Math.random() * size);
+                            if (!targetCols.includes(c)) targetCols.push(c);
+                        }
+                        
+                        targetRows.forEach(tr => {
+                            const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                            const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
+                            for (let c = 0; c < size; c++) {
+                                solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                            }
+                        });
+                        
+                        targetCols.forEach(tc => {
+                            const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                            const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
+                            for (let r = 0; r < size; r++) {
+                                if (r >= colStartPos && r < colStartPos + colLen) {
+                                    solution[r][tc] = 1;
+                                } else {
+                                    if (!targetRows.includes(r)) solution[r][tc] = 0;
+                                }
+                            }
+                        });
+                    } else {
+                        // 가로/세로 스타터 힌트 강제 적용 (가로 1줄, 세로 1줄)
+                        let minLen = 3, maxLen = 4;
+                        if (size === 10) { minLen = 7; maxLen = 8; }
+                        else if (size === 15) { minLen = 10; maxLen = 12; }
+                        
                         const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        
+                        const targetRow = Math.floor(Math.random() * size);
                         const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
                         for (let c = 0; c < size; c++) {
-                            solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                            solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
                         }
-                    });
-                    
-                    targetCols.forEach(tc => {
-                        const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        
+                        const targetCol = Math.floor(Math.random() * size);
                         const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
                         for (let r = 0; r < size; r++) {
                             if (r >= colStartPos && r < colStartPos + colLen) {
-                                solution[r][tc] = 1;
+                                solution[r][targetCol] = 1;
                             } else {
-                                if (!targetRows.includes(r)) solution[r][tc] = 0;
+                                if (r !== targetRow) solution[r][targetCol] = 0;
                             }
                         }
-                    });
+                    }
                     
                     solvable = isLogicallySolvable(size, solution);
                 }
@@ -830,8 +862,14 @@
             } 
             else if (activeGenerationMode === 2) {
                 // 2. '뼈대와 구멍' 위주의 외곽선 배치 (뭉침 방지)
-                activeModeName = "[2번 방식: 외곽선 & 뼈대 방식]";
-                activeModeDesc = "큼직한 스타터 힌트 2줄이 포함된 뼈대형 맵이며, 한결 쉽게 풀립니다.";
+                const useTwoStarters = Math.random() < 0.5;
+                if (useTwoStarters) {
+                    activeModeName = "[2번 방식: 외곽선 & 뼈대 방식] (쉬움)";
+                    activeModeDesc = "큼직한 스타터 힌트 2줄이 포함된 뼈대형 맵이며, 한결 쉽게 풀립니다.";
+                } else {
+                    activeModeName = "[2번 방식: 외곽선 & 뼈대 방식] (보통)";
+                    activeModeDesc = "가로/세로 1줄의 스타터 힌트가 보장되는 뼈대형 맵이며, 적당한 난이도를 제공합니다.";
+                }
                 
                 let solvable = false;
                 let attempts = 0;
@@ -888,42 +926,68 @@
                         }
                     }
                     
-                    // 가로/세로 스타터 힌트 강제 적용 (가로 2줄, 세로 2줄)
-                    let minLen = 3, maxLen = 4;
-                    if (size === 10) { minLen = 7; maxLen = 9; }
-                    else if (size === 15) { minLen = 11; maxLen = 13; }
-                    
-                    let targetRows = [];
-                    while (targetRows.length < 2) {
-                        let r = Math.floor(Math.random() * size);
-                        if (!targetRows.includes(r)) targetRows.push(r);
-                    }
-                    
-                    let targetCols = [];
-                    while (targetCols.length < 2) {
-                        let c = Math.floor(Math.random() * size);
-                        if (!targetCols.includes(c)) targetCols.push(c);
-                    }
-                    
-                    targetRows.forEach(tr => {
+                    if (useTwoStarters) {
+                        // 가로/세로 스타터 힌트 강제 적용 (가로 2줄, 세로 2줄)
+                        let minLen = 3, maxLen = 4;
+                        if (size === 10) { minLen = 7; maxLen = 9; }
+                        else if (size === 15) { minLen = 11; maxLen = 13; }
+                        
+                        let targetRows = [];
+                        while (targetRows.length < 2) {
+                            let r = Math.floor(Math.random() * size);
+                            if (!targetRows.includes(r)) targetRows.push(r);
+                        }
+                        
+                        let targetCols = [];
+                        while (targetCols.length < 2) {
+                            let c = Math.floor(Math.random() * size);
+                            if (!targetCols.includes(c)) targetCols.push(c);
+                        }
+                        
+                        targetRows.forEach(tr => {
+                            const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                            const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
+                            for (let c = 0; c < size; c++) {
+                                solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                            }
+                        });
+                        
+                        targetCols.forEach(tc => {
+                            const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                            const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
+                            for (let r = 0; r < size; r++) {
+                                if (r >= colStartPos && r < colStartPos + colLen) {
+                                    solution[r][tc] = 1;
+                                } else {
+                                    if (!targetRows.includes(r)) solution[r][tc] = 0;
+                                }
+                            }
+                        });
+                    } else {
+                        // 가로/세로 스타터 힌트 강제 적용 (가로 1줄, 세로 1줄)
+                        let minLen = 3, maxLen = 4;
+                        if (size === 10) { minLen = 7; maxLen = 8; }
+                        else if (size === 15) { minLen = 10; maxLen = 12; }
+                        
                         const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        
+                        const targetRow = Math.floor(Math.random() * size);
                         const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
                         for (let c = 0; c < size; c++) {
-                            solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                            solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
                         }
-                    });
-                    
-                    targetCols.forEach(tc => {
-                        const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        
+                        const targetCol = Math.floor(Math.random() * size);
                         const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
                         for (let r = 0; r < size; r++) {
                             if (r >= colStartPos && r < colStartPos + colLen) {
-                                solution[r][tc] = 1;
+                                solution[r][targetCol] = 1;
                             } else {
-                                if (!targetRows.includes(r)) solution[r][tc] = 0;
+                                if (r !== targetRow) solution[r][targetCol] = 0;
                             }
                         }
-                    });
+                    }
                     
                     solvable = isLogicallySolvable(size, solution);
                 }
@@ -934,8 +998,14 @@
             } 
             else if (activeGenerationMode === 3) {
                 // 3. 실타래 시작점 방식
-                activeModeName = "[3번 방식: 실타래 시작점 방식]";
-                activeModeDesc = "큼직한 스타터 힌트 2줄이 보장되며, 100% 논리로 풀립니다.";
+                const useTwoStarters = Math.random() < 0.5;
+                if (useTwoStarters) {
+                    activeModeName = "[3번 방식: 실타래 시작점 방식] (쉬움)";
+                    activeModeDesc = "큼직한 스타터 힌트 2줄이 보장되며, 100% 논리로 풀립니다.";
+                } else {
+                    activeModeName = "[3번 방식: 실타래 시작점 방식] (보통)";
+                    activeModeDesc = "가로/세로 1줄의 스타터 힌트가 보장되며, 100% 논리로 풀립니다.";
+                }
                 
                 let solvable = false;
                 let attempts = 0;
@@ -981,42 +1051,68 @@
                         }
                     }
                     
-                    // 3단계: 가로/세로 스타터 힌트 배치 (가로 2줄, 세로 2줄)
-                    let minLen = 3, maxLen = 4;
-                    if (size === 10) { minLen = 7; maxLen = 9; }
-                    else if (size === 15) { minLen = 11; maxLen = 13; }
-                    
-                    let targetRows = [];
-                    while (targetRows.length < 2) {
-                        let r = Math.floor(Math.random() * size);
-                        if (!targetRows.includes(r)) targetRows.push(r);
-                    }
-                    
-                    let targetCols = [];
-                    while (targetCols.length < 2) {
-                        let c = Math.floor(Math.random() * size);
-                        if (!targetCols.includes(c)) targetCols.push(c);
-                    }
-                    
-                    targetRows.forEach(tr => {
+                    if (useTwoStarters) {
+                        // 3단계: 가로/세로 스타터 힌트 배치 (가로 2줄, 세로 2줄)
+                        let minLen = 3, maxLen = 4;
+                        if (size === 10) { minLen = 7; maxLen = 9; }
+                        else if (size === 15) { minLen = 11; maxLen = 13; }
+                        
+                        let targetRows = [];
+                        while (targetRows.length < 2) {
+                            let r = Math.floor(Math.random() * size);
+                            if (!targetRows.includes(r)) targetRows.push(r);
+                        }
+                        
+                        let targetCols = [];
+                        while (targetCols.length < 2) {
+                            let c = Math.floor(Math.random() * size);
+                            if (!targetCols.includes(c)) targetCols.push(c);
+                        }
+                        
+                        targetRows.forEach(tr => {
+                            const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                            const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
+                            for (let c = 0; c < size; c++) {
+                                solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                            }
+                        });
+                        
+                        targetCols.forEach(tc => {
+                            const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                            const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
+                            for (let r = 0; r < size; r++) {
+                                if (r >= colStartPos && r < colStartPos + colLen) {
+                                    solution[r][tc] = 1;
+                                } else {
+                                    if (!targetRows.includes(r)) solution[r][tc] = 0;
+                                }
+                            }
+                        });
+                    } else {
+                        // 3단계: 가로/세로 스타터 힌트 배치 (가로 1줄, 세로 1줄)
+                        let minLen = 3, maxLen = 4;
+                        if (size === 10) { minLen = 7; maxLen = 8; }
+                        else if (size === 15) { minLen = 10; maxLen = 12; }
+                        
                         const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        
+                        const targetRow = Math.floor(Math.random() * size);
                         const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
                         for (let c = 0; c < size; c++) {
-                            solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                            solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
                         }
-                    });
-                    
-                    targetCols.forEach(tc => {
-                        const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        
+                        const targetCol = Math.floor(Math.random() * size);
                         const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
                         for (let r = 0; r < size; r++) {
                             if (r >= colStartPos && r < colStartPos + colLen) {
-                                solution[r][tc] = 1;
+                                solution[r][targetCol] = 1;
                             } else {
-                                if (!targetRows.includes(r)) solution[r][tc] = 0;
+                                if (r !== targetRow) solution[r][targetCol] = 0;
                             }
                         }
-                    });
+                    }
                     
                     // 4단계: 논리적 해결 가능성 체크
                     solvable = isLogicallySolvable(size, solution);
@@ -1029,8 +1125,14 @@
             } 
             else if (activeGenerationMode === 4) {
                 // 4. 최적의 밀도 밸런스
-                activeModeName = "[4번 방식: 최적 밀도 밸런스]";
-                activeModeDesc = "스타터 힌트 2줄이 추가되어 첫 실마리를 잡기 편한 최적 밀도 맵입니다.";
+                const useTwoStarters = Math.random() < 0.5;
+                if (useTwoStarters) {
+                    activeModeName = "[4번 방식: 최적 밀도 밸런스] (쉬움)";
+                    activeModeDesc = "스타터 힌트 2줄이 추가되어 첫 실마리를 잡기 편한 최적 밀도 맵입니다.";
+                } else {
+                    activeModeName = "[4번 방식: 최적 밀도 밸런스] (보통)";
+                    activeModeDesc = "가로/세로 1줄의 스타터 힌트가 보장되며, 최적의 채움 비율을 유지하는 맵입니다.";
+                }
                 
                 let solvable = false;
                 let attempts = 0;
@@ -1075,42 +1177,68 @@
                         }
                     }
 
-                    // 가로/세로 스타터 힌트 강제 적용 (가로 2줄, 세로 2줄)
-                    let minLen = 3, maxLen = 4;
-                    if (size === 10) { minLen = 7; maxLen = 9; }
-                    else if (size === 15) { minLen = 11; maxLen = 13; }
-                    
-                    let targetRows = [];
-                    while (targetRows.length < 2) {
-                        let r = Math.floor(Math.random() * size);
-                        if (!targetRows.includes(r)) targetRows.push(r);
-                    }
-                    
-                    let targetCols = [];
-                    while (targetCols.length < 2) {
-                        let c = Math.floor(Math.random() * size);
-                        if (!targetCols.includes(c)) targetCols.push(c);
-                    }
-                    
-                    targetRows.forEach(tr => {
+                    if (useTwoStarters) {
+                        // 가로/세로 스타터 힌트 강제 적용 (가로 2줄, 세로 2줄)
+                        let minLen = 3, maxLen = 4;
+                        if (size === 10) { minLen = 7; maxLen = 9; }
+                        else if (size === 15) { minLen = 11; maxLen = 13; }
+                        
+                        let targetRows = [];
+                        while (targetRows.length < 2) {
+                            let r = Math.floor(Math.random() * size);
+                            if (!targetRows.includes(r)) targetRows.push(r);
+                        }
+                        
+                        let targetCols = [];
+                        while (targetCols.length < 2) {
+                            let c = Math.floor(Math.random() * size);
+                            if (!targetCols.includes(c)) targetCols.push(c);
+                        }
+                        
+                        targetRows.forEach(tr => {
+                            const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                            const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
+                            for (let c = 0; c < size; c++) {
+                                solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                            }
+                        });
+                        
+                        targetCols.forEach(tc => {
+                            const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                            const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
+                            for (let r = 0; r < size; r++) {
+                                if (r >= colStartPos && r < colStartPos + colLen) {
+                                    solution[r][tc] = 1;
+                                } else {
+                                    if (!targetRows.includes(r)) solution[r][tc] = 0;
+                                }
+                            }
+                        });
+                    } else {
+                        // 가로/세로 스타터 힌트 강제 적용 (가로 1줄, 세로 1줄)
+                        let minLen = 3, maxLen = 4;
+                        if (size === 10) { minLen = 7; maxLen = 8; }
+                        else if (size === 15) { minLen = 10; maxLen = 12; }
+                        
                         const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        
+                        const targetRow = Math.floor(Math.random() * size);
                         const rowStartPos = Math.floor(Math.random() * (size - rowLen + 1));
                         for (let c = 0; c < size; c++) {
-                            solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
+                            solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
                         }
-                    });
-                    
-                    targetCols.forEach(tc => {
-                        const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+                        
+                        const targetCol = Math.floor(Math.random() * size);
                         const colStartPos = Math.floor(Math.random() * (size - colLen + 1));
                         for (let r = 0; r < size; r++) {
                             if (r >= colStartPos && r < colStartPos + colLen) {
-                                solution[r][tc] = 1;
+                                solution[r][targetCol] = 1;
                             } else {
-                                if (!targetRows.includes(r)) solution[r][tc] = 0;
+                                if (r !== targetRow) solution[r][targetCol] = 0;
                             }
                         }
-                    });
+                    }
                     
                     // 3단계: 밀도 체크 및 논리적 해결 가능성 체크
                     const filledCount = solution.flat().filter(v => v === 1).length;
