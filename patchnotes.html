@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>대중소 네모로직 패치노트 - v1.4.0</title>
+    <title>대중소 네모로직 패치노트 - v1.5.0</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap');
 
@@ -228,17 +228,56 @@
 
     <div class="container">
         <header>
-            <div class="version-badge">PATCH v1.4.1</div>
+            <div class="version-badge">PATCH v1.5.0</div>
             <h1>대중소 네모로직 패치노트</h1>
-            <div class="patch-date">2026.06.29 • DIFFICULTY BALANCE & DE-FRAGMENTATION UPDATE</div>
+            <div class="patch-date">2026.07.01 • EXTREME FUN & QUALITY EVALUATION UPDATE</div>
         </header>
 
         <main class="card">
             <p class="intro-text">
-                사용자의 피드백을 반영하여 퍼즐 생성 1~4번 모드의 스타터 힌트 밸런스를 조절하고, 퍼즐이 너무 복잡하게 쪼개져 피로감을 유도하던 파편화 현상을 완화하여 더 재미있고 적당한 난이도로 즐길 수 있게 조율한 알고리즘 업데이트입니다.
+                네모로직 퍼즐 풀이 본연의 논리적 몰입감과 재미를 보장하기 위해 퍼즐 생성 필터링 및 난이도 밸런스를 고도화한 패치입니다. 너무 직관적이고 쉬운 문제나 지나치게 복잡한 파편화 맵을 걸러내고 "도미노 연쇄 추론(Cascade)"의 깊이를 강화했습니다.
             </p>
 
-            <h2>v1.4.1 신규 업데이트 사항</h2>
+            <h2>v1.5.0 신규 업데이트 사항</h2>
+            
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="feature-title">
+                        <span>🧠</span> 1. 다각적 퍼즐 품질 평가 시스템 (evaluatePuzzleQuality) 도입
+                    </div>
+                    <div class="feature-desc">
+                        퍼즐 생성 즉시 다음과 같은 기준을 평가하여 기준에 미달하는 도안은 자동 탈락시키고 새로 생성합니다:
+                        <ul>
+                            <li><strong>적정 밀도 필터링:</strong> 전체 칸 중 38% ~ 52%의 색칠 비율 유지.</li>
+                            <li><strong>시작점 힌트 보장:</strong> 10x10 격자에서는 최소 6칸, 15x15 격자에서는 최소 9칸 이상 연속되는 확실한 스타터 단서 1줄 보장.</li>
+                            <li><strong>최대 힌트 제한 (너무 쉬움 방지):</strong> 10x10에서는 8칸 이상, 15x15에서는 12칸 이상의 너무 큰 힌트 블록은 배제하여 단숨에 풀리는 시시함을 방지.</li>
+                            <li><strong>파편화 제한 (피로감 해소):</strong> 한 줄에 잘게 쪼개진 힌트 갯수를 10x10 기준 3개, 15x15 기준 4개 이하로 제한하여 1,1,1 등의 잦은 파편화 방지.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-title">
+                        <span>🔗</span> 2. 연쇄 논리 추론 깊이(Cascade Depth) 검증 강화
+                    </div>
+                    <div class="feature-desc">
+                        이전 단계의 단서가 다음 단서의 힌트로 이어지는 다단계 추론의 재미를 보장하기 위해, 솔버 스캔 횟수가 3회 이상(Cascade Depth >= 3) 반복되어야 해결되는 퍼즐만 엄선하여 제공합니다. 이로 인해 한두 번의 터치로 싱겁게 끝나는 맵이 사라지고 깊은 논리적 재미를 줍니다.
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-title">
+                        <span>🚀</span> 3. 스타터 힌트 갯수 축소 및 밸런스 조정 (v1.4.2 내용 병합)
+                    </div>
+                    <div class="feature-desc">
+                        기존의 2줄 제공(쉬움) 및 1줄씩 교차 제공(보통) 방식이 지나치게 직관적인 실마리를 제공하여 게임이 너무 쉽게 풀린다는 피드백을 반영했습니다. 이제 <strong>쉬움 난이도는 가로 또는 세로 1줄의 스타터 힌트만 무작위로 제공</strong>하도록 변경되었으며, 지나치게 쉬웠던 보통 난이도는 중복성 제거를 위해 제외했습니다.
+                    </div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <h2>v1.4.1 이전 업데이트 사항</h2>
             
             <div class="feature-list">
                 <div class="feature-item">

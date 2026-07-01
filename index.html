@@ -724,86 +724,131 @@
         }
 
         // --- 스타터 힌트 교차점 간섭 보정 함수 ---
-        function applyStarterHints(useTwoStarters) {
+        function applyStarterHints() {
             let minLen = 3, maxLen = 4;
-            if (useTwoStarters) {
-                if (size === 10) { minLen = 7; maxLen = 9; }
-                else if (size === 15) { minLen = 11; maxLen = 13; }
+            if (size === 10) { minLen = 7; maxLen = 8; }
+            else if (size === 15) { minLen = 10; maxLen = 12; }
+            
+            const len = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
+            const isRow = Math.random() < 0.5;
+
+            if (isRow) {
+                const targetRow = Math.floor(Math.random() * size);
+                const startPos = Math.floor(Math.random() * (size - len + 1));
+                for (let c = 0; c < size; c++) {
+                    solution[targetRow][c] = (c >= startPos && c < startPos + len) ? 1 : 0;
+                }
             } else {
-                if (size === 10) { minLen = 7; maxLen = 8; }
-                else if (size === 15) { minLen = 10; maxLen = 12; }
+                const targetCol = Math.floor(Math.random() * size);
+                const startPos = Math.floor(Math.random() * (size - len + 1));
+                for (let r = 0; r < size; r++) {
+                    solution[r][targetCol] = (r >= startPos && r < startPos + len) ? 1 : 0;
+                }
+            }
+        }
+
+        function getQualityConfig(attempts, size) {
+            if (attempts > 120) {
+                // Level 4: basic solvability only
+                return { minDensity: 0.25, maxDensity: 0.70, maxHintLimit: size, starterHintThreshold: 1, maxSegmentsLimit: size, minIterations: 1 };
+            } else if (attempts > 80) {
+                // Level 3: allow slightly simpler and more segmented
+                return { minDensity: 0.33, maxDensity: 0.60, maxHintLimit: size === 10 ? 8 : 13, starterHintThreshold: size === 10 ? 5 : 8, maxSegmentsLimit: size === 10 ? 4 : 5, minIterations: 2 };
+            } else if (attempts > 40) {
+                // Level 2: density and iterations slightly relaxed
+                return { minDensity: 0.35, maxDensity: 0.55, maxHintLimit: size === 10 ? 7 : 11, starterHintThreshold: size === 10 ? 6 : 9, maxSegmentsLimit: size === 10 ? 3 : 4, minIterations: 2 };
+            } else {
+                // Level 1: strict high quality
+                return { minDensity: 0.38, maxDensity: 0.52, maxHintLimit: size === 10 ? 7 : 11, starterHintThreshold: size === 10 ? 6 : 9, maxSegmentsLimit: size === 10 ? 3 : 4, minIterations: 3 };
+            }
+        }
+
+        function evaluatePuzzleQuality(size, solution, config = {}) {
+            const rowHints = solution.map(row => getHints(row));
+            const colHints = Array(size).fill().map((_, c) => getHints(solution.map(row => row[c])));
+            
+            // 1. Density Check (default: 38% ~ 52%)
+            const filledCount = solution.flat().filter(v => v === 1).length;
+            const density = filledCount / (size * size);
+            let minDensity = config.minDensity !== undefined ? config.minDensity : 0.38;
+            let maxDensity = config.maxDensity !== undefined ? config.maxDensity : 0.52;
+            if (density < minDensity || density > maxDensity) return { ok: false, reason: "density" };
+
+            // 2. Clue Constraints
+            let maxHintLimit = config.maxHintLimit || (size === 10 ? 7 : (size === 15 ? 11 : 4));
+            let starterHintThreshold = config.starterHintThreshold || (size === 10 ? 6 : (size === 15 ? 9 : 3));
+            let maxSegmentsLimit = config.maxSegmentsLimit || (size === 10 ? 3 : (size === 15 ? 4 : 2));
+            
+            let hasStarterHint = false;
+            
+            // Check row hints
+            for (let r = 0; r < size; r++) {
+                const hints = rowHints[r];
+                if (hints.length > maxSegmentsLimit) return { ok: false, reason: "fragmentation" };
+                for (let h of hints) {
+                    if (h > maxHintLimit) return { ok: false, reason: "too_easy" };
+                    if (h >= starterHintThreshold) hasStarterHint = true;
+                }
             }
             
-            const rowLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
-            const colLen = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
-
-            if (useTwoStarters) {
-                const tr1 = Math.floor(Math.random() * size);
-                let tr2;
-                const trMin = Math.max(0, tr1 - colLen + 1);
-                const trMax = Math.min(size - 1, tr1 + colLen - 1);
-                const possibleRows = [];
-                for (let r = trMin; r <= trMax; r++) {
-                    if (r !== tr1) possibleRows.push(r);
-                }
-                if (possibleRows.length > 0) {
-                    tr2 = possibleRows[Math.floor(Math.random() * possibleRows.length)];
-                } else {
-                    tr2 = tr1 === 0 ? 1 : tr1 - 1;
-                }
-                
-                const tc1 = Math.floor(Math.random() * size);
-                let tc2;
-                const tcMin = Math.max(0, tc1 - rowLen + 1);
-                const tcMax = Math.min(size - 1, tc1 + rowLen - 1);
-                const possibleCols = [];
-                for (let c = tcMin; c <= tcMax; c++) {
-                    if (c !== tc1) possibleCols.push(c);
-                }
-                if (possibleCols.length > 0) {
-                    tc2 = possibleCols[Math.floor(Math.random() * possibleCols.length)];
-                } else {
-                    tc2 = tc1 === 0 ? 1 : tc1 - 1;
-                }
-
-                const targetRows = [tr1, tr2];
-                const targetCols = [tc1, tc2];
-
-                targetRows.forEach(tr => {
-                    const minRowStart = Math.max(0, Math.max(tc1, tc2) - rowLen + 1);
-                    const maxRowStart = Math.min(size - rowLen, Math.min(tc1, tc2));
-                    const rowStartPos = Math.floor(Math.random() * (maxRowStart - minRowStart + 1)) + minRowStart;
-                    for (let c = 0; c < size; c++) {
-                        solution[tr][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
-                    }
-                });
-
-                targetCols.forEach(tc => {
-                    const minColStart = Math.max(0, Math.max(tr1, tr2) - colLen + 1);
-                    const maxColStart = Math.min(size - colLen, Math.min(tr1, tr2));
-                    const colStartPos = Math.floor(Math.random() * (maxColStart - minColStart + 1)) + minColStart;
-                    for (let r = 0; r < size; r++) {
-                        solution[r][tc] = (r >= colStartPos && r < colStartPos + colLen) ? 1 : 0;
-                    }
-                });
-            } else {
-                const targetRow = Math.floor(Math.random() * size);
-                const targetCol = Math.floor(Math.random() * size);
-
-                const minRowStart = Math.max(0, targetCol - rowLen + 1);
-                const maxRowStart = Math.min(size - rowLen, targetCol);
-                const rowStartPos = Math.floor(Math.random() * (maxRowStart - minRowStart + 1)) + minRowStart;
-                for (let c = 0; c < size; c++) {
-                    solution[targetRow][c] = (c >= rowStartPos && c < rowStartPos + rowLen) ? 1 : 0;
-                }
-
-                const minColStart = Math.max(0, targetRow - colLen + 1);
-                const maxColStart = Math.min(size - colLen, targetRow);
-                const colStartPos = Math.floor(Math.random() * (maxColStart - minColStart + 1)) + minColStart;
-                for (let r = 0; r < size; r++) {
-                    solution[r][targetCol] = (r >= colStartPos && r < colStartPos + colLen) ? 1 : 0;
+            // Check col hints
+            for (let c = 0; c < size; c++) {
+                const hints = colHints[c];
+                if (hints.length > maxSegmentsLimit) return { ok: false, reason: "fragmentation" };
+                for (let h of hints) {
+                    if (h > maxHintLimit) return { ok: false, reason: "too_easy" };
+                    if (h >= starterHintThreshold) hasStarterHint = true;
                 }
             }
+            
+            if (!hasStarterHint) return { ok: false, reason: "no_starter" };
+
+            // 3. Solve & Iteration count check (Cascade Depth)
+            const board = Array(size).fill().map(() => Array(size).fill(0));
+            let changed = true;
+            let iterations = 0;
+            const maxIterations = size * 3;
+
+            while (changed && iterations < maxIterations) {
+                changed = false;
+                iterations++;
+
+                for (let r = 0; r < size; r++) {
+                    const solved = solveLine(size, rowHints[r], board[r]);
+                    if (!solved) return { ok: false, reason: "unsolvable" };
+                    for (let c = 0; c < size; c++) {
+                        if (board[r][c] === 0 && solved[c] !== 0) {
+                            board[r][c] = solved[c];
+                            changed = true;
+                        }
+                    }
+                }
+
+                for (let c = 0; c < size; c++) {
+                    const currentLine = board.map(row => row[c]);
+                    const solved = solveLine(size, colHints[c], currentLine);
+                    if (!solved) return { ok: false, reason: "unsolvable" };
+                    for (let r = 0; r < size; r++) {
+                        if (board[r][c] === 0 && solved[r] !== 0) {
+                            board[r][c] = solved[r];
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
+            // Check if fully solved
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (board[r][c] === 0) return { ok: false, reason: "incomplete" };
+                }
+            }
+
+            // Iterations check: cascade depth
+            let minIterations = config.minIterations !== undefined ? config.minIterations : 3;
+            if (iterations < minIterations) return { ok: false, reason: "too_simple" };
+
+            return { ok: true, iterations: iterations };
         }
 
         function generateRandomSolution() {
@@ -828,18 +873,12 @@
             } 
             else if (activeGenerationMode === 1) {
                 // 1. 100% 논리 풀이 보장 (No-Guessing)
-                const useTwoStarters = Math.random() < 0.5;
-                if (useTwoStarters) {
-                    activeModeName = "[1번 방식: 100% 논리 풀이 보장] (쉬움)";
-                    activeModeDesc = "큼직한 스타터 힌트 2줄이 보장되어 한결 쉬워진 100% 논리적 맵입니다.";
-                } else {
-                    activeModeName = "[1번 방식: 100% 논리 풀이 보장] (보통)";
-                    activeModeDesc = "가로/세로 1줄의 스타터 힌트가 보장되어 적절한 난이도를 지닌 100% 논리적 맵입니다.";
-                }
+                activeModeName = "[1번 방식: 100% 논리 풀이 보장] (쉬움)";
+                activeModeDesc = "가로 또는 세로 1줄의 스타터 힌트가 보장되어 첫 실마리를 찾기 좋은 100% 논리적 맵입니다.";
                 
                 let solvable = false;
                 let attempts = 0;
-                while (!solvable && attempts < 100) {
+                while (!solvable && attempts < 150) {
                     attempts++;
                     // 연속성 확보를 위해 이전 셀의 영향을 받도록 생성 (파편화 방지)
                     solution = Array(size).fill().map(() => Array(size).fill(0));
@@ -873,9 +912,10 @@
                         }
                     }
 
-                    applyStarterHints(useTwoStarters);
+                    applyStarterHints();
                     
-                    solvable = isLogicallySolvable(size, solution);
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
                 }
                 
                 if (!solvable) {
@@ -884,18 +924,12 @@
             } 
             else if (activeGenerationMode === 2) {
                 // 2. '뼈대와 구멍' 위주의 외곽선 배치 (뭉침 방지)
-                const useTwoStarters = Math.random() < 0.5;
-                if (useTwoStarters) {
-                    activeModeName = "[2번 방식: 외곽선 & 뼈대 방식] (쉬움)";
-                    activeModeDesc = "큼직한 스타터 힌트 2줄이 포함된 뼈대형 맵이며, 한결 쉽게 풀립니다.";
-                } else {
-                    activeModeName = "[2번 방식: 외곽선 & 뼈대 방식] (보통)";
-                    activeModeDesc = "가로/세로 1줄의 스타터 힌트가 보장되는 뼈대형 맵이며, 적당한 난이도를 제공합니다.";
-                }
+                activeModeName = "[2번 방식: 외곽선 & 뼈대 방식] (쉬움)";
+                activeModeDesc = "가로 또는 세로 1줄의 스타터 힌트가 보장되는 뼈대형 맵입니다.";
                 
                 let solvable = false;
                 let attempts = 0;
-                while (!solvable && attempts < 100) {
+                while (!solvable && attempts < 150) {
                     attempts++;
                     
                     solution = Array(size).fill().map(() => Array(size).fill(0));
@@ -948,9 +982,10 @@
                         }
                     }
                     
-                    applyStarterHints(useTwoStarters);
+                    applyStarterHints();
                     
-                    solvable = isLogicallySolvable(size, solution);
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
                 }
                 
                 if (!solvable) {
@@ -959,18 +994,12 @@
             } 
             else if (activeGenerationMode === 3) {
                 // 3. 실타래 시작점 방식
-                const useTwoStarters = Math.random() < 0.5;
-                if (useTwoStarters) {
-                    activeModeName = "[3번 방식: 실타래 시작점 방식] (쉬움)";
-                    activeModeDesc = "큼직한 스타터 힌트 2줄이 보장되며, 100% 논리로 풀립니다.";
-                } else {
-                    activeModeName = "[3번 방식: 실타래 시작점 방식] (보통)";
-                    activeModeDesc = "가로/세로 1줄의 스타터 힌트가 보장되며, 100% 논리로 풀립니다.";
-                }
+                activeModeName = "[3번 방식: 실타래 시작점 방식] (쉬움)";
+                activeModeDesc = "가로 또는 세로 1줄의 스타터 힌트가 보장되며, 100% 논리로 풀립니다.";
                 
                 let solvable = false;
                 let attempts = 0;
-                while (!solvable && attempts < 100) {
+                while (!solvable && attempts < 150) {
                     attempts++;
                     
                     // 1단계: 주변 이웃을 고려해 싱글톤(1칸 점)이 적은 기본 맵 생성 (연속성 상향)
@@ -1012,10 +1041,10 @@
                         }
                     }
                     
-                    applyStarterHints(useTwoStarters);
+                    applyStarterHints();
                     
-                    // 4단계: 논리적 해결 가능성 체크
-                    solvable = isLogicallySolvable(size, solution);
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
                 }
                 
                 // 100번 안에 완벽한 맵을 못 찾았을 경우 대비한 백업 안전장치
@@ -1025,18 +1054,12 @@
             } 
             else if (activeGenerationMode === 4) {
                 // 4. 최적의 밀도 밸런스
-                const useTwoStarters = Math.random() < 0.5;
-                if (useTwoStarters) {
-                    activeModeName = "[4번 방식: 최적 밀도 밸런스] (쉬움)";
-                    activeModeDesc = "스타터 힌트 2줄이 추가되어 첫 실마리를 잡기 편한 최적 밀도 맵입니다.";
-                } else {
-                    activeModeName = "[4번 방식: 최적 밀도 밸런스] (보통)";
-                    activeModeDesc = "가로/세로 1줄의 스타터 힌트가 보장되며, 최적의 채움 비율을 유지하는 맵입니다.";
-                }
+                activeModeName = "[4번 방식: 최적 밀도 밸런스] (쉬움)";
+                activeModeDesc = "가로 또는 세로 1줄의 스타터 힌트가 보장되어 첫 실마리를 잡기 편한 최적 밀도 맵입니다.";
                 
                 let solvable = false;
                 let attempts = 0;
-                while (!solvable && attempts < 100) {
+                while (!solvable && attempts < 150) {
                     attempts++;
                     
                     // 1단계: 주변 이웃을 고려해 싱글톤(1칸 점)이 적은 기본 맵 생성 (연속성 상향)
@@ -1077,14 +1100,10 @@
                         }
                     }
 
-                    applyStarterHints(useTwoStarters);
+                    applyStarterHints();
                     
-                    // 3단계: 밀도 체크 및 논리적 해결 가능성 체크
-                    const filledCount = solution.flat().filter(v => v === 1).length;
-                    const ratio = filledCount / (size * size);
-                    if (ratio >= 0.40 && ratio <= 0.52) {
-                        solvable = isLogicallySolvable(size, solution);
-                    }
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
                 }
                 
                 // 100번 안에 완벽한 맵을 못 찾았을 경우 대비한 백업
