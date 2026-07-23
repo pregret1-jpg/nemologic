@@ -482,6 +482,12 @@
             <option value="10" selected>10 x 10</option>
             <option value="15">15 x 15</option>
         </select>
+        <label for="diffSelect" class="setup-label">난이도:</label>
+        <select id="diffSelect" style="margin-right: 10px;">
+            <option value="easy">😊 쉬움</option>
+            <option value="normal" selected>🤔 보통</option>
+            <option value="hard">🔥 어려움</option>
+        </select>
         <button onclick="startNewGame()" class="primary-btn">새 게임 만들기</button>
     </div>
 
@@ -626,6 +632,63 @@
                 else if (allTwo) result[i] = 2;
             }
             return result;
+        }
+
+
+        // ═══ 난이도 측정: 라인솔버 패스 수 = 사람이 오가야 하는 횟수 ═══
+        function solveMeta(size, solution){
+            const rowHints = solution.map(row => getHints(row));
+            const colHints = Array(size).fill().map((_, c) => getHints(solution.map(row => row[c])));
+            const board = Array(size).fill().map(() => Array(size).fill(0));
+            let changed = true, passes = 0;
+            const maxIterations = size * 3;
+            const progress = [];                      // ⭐패스별 신규 확정 셀 수(풀이 리듬 곡선)
+            while (changed && passes < maxIterations) {
+                changed = false; passes++;
+                let gained = 0;
+                for (let r = 0; r < size; r++) {
+                    const solved = solveLine(size, rowHints[r], board[r]);
+                    if (!solved) return {solvable:false, passes, progress};
+                    for (let c = 0; c < size; c++) if (board[r][c] === 0 && solved[c] !== 0){ board[r][c] = solved[c]; changed = true; gained++; }
+                }
+                for (let c = 0; c < size; c++) {
+                    const cur = board.map(row => row[c]);
+                    const solved = solveLine(size, colHints[c], cur);
+                    if (!solved) return {solvable:false, passes, progress};
+                    for (let r = 0; r < size; r++) if (board[r][c] === 0 && solved[r] !== 0){ board[r][c] = solved[r]; changed = true; gained++; }
+                }
+                if (gained > 0) progress.push(gained);
+            }
+            const done = board.flat().every(v => v !== 0);
+            return {solvable: done, passes, progress};
+        }
+
+        // ═══ ⭐풀이 재미 점수(2026-07-03): '도미노 체인' 리듬을 수치화 ═══
+        //  ①첫 패스 확정률 15~35% = 실마리는 있지만 시시하지 않음
+        //  ②패스마다 고르게 풀림(진행 곡선 평탄) = 막힘·급붕괴 없이 아하-아하-아하
+        //  ③마지막 패스 몫이 너무 크면(>40%) 감점 = 후반 노가다 방지
+        function funScore(size, meta){
+            const total = size * size;
+            const pr = meta.progress;
+            if (!meta.solvable || pr.length < 2) return -1e9;
+            const first = pr[0] / total;
+            let score = 0;
+            score -= Math.abs(first - 0.25) * 40;                        // 첫 패스 스위트스팟(25%)
+            const mean = pr.reduce((a,b)=>a+b,0)/pr.length;
+            const cv = Math.sqrt(pr.reduce((a,b)=>a+(b-mean)*(b-mean),0)/pr.length) / mean;
+            score -= cv * 10;                                            // 리듬 평탄성(변동계수)
+            const last = pr[pr.length-1] / total;
+            if (last > 0.4) score -= (last - 0.4) * 30;                  // 막판 우르르 감점
+            score += Math.min(pr.length, 8);                             // 체인 길이 보너스
+            return score;
+        }
+
+        // 난이도 밴드(패스 수 기준): 스파이더와 같은 '밴드 샘플링' 철학 — 극과극 없이 일관된 손맛
+        function diffBand(size){
+            const d = (document.getElementById('diffSelect')||{}).value || 'normal';
+            if (size === 5)  return d==='easy'?[1,2]:d==='normal'?[3,4]:[5,99];
+            if (size === 10) return d==='easy'?[1,4]:d==='normal'?[5,8]:[9,99];
+            return d==='easy'?[1,5]:d==='normal'?[6,10]:[11,99];
         }
 
         function isLogicallySolvable(size, solution) {
@@ -852,6 +915,28 @@
         }
 
         function generateRandomSolution() {
+            const band = diffBand(size);
+            // ⭐절차 생성: 표본 여러 판 중 '난이도 밴드 안에서 풀이 재미(funScore) 최고' 채택
+            let bestIn = null, bestInScore = -1e9;     // 밴드 안 최고 재미
+            let bestNear = null, bestNearGap = 1e9;    // 밴드 근접 폴백
+            const TRIES = size === 15 ? 24 : 40;
+            for (let bandTry = 0; bandTry < TRIES; bandTry++) {
+                _genOnce();
+                const m = solveMeta(size, solution);
+                if (!m.solvable) continue;
+                if (m.passes >= band[0] && m.passes <= band[1]) {
+                    const f = funScore(size, m);
+                    if (f > bestInScore) { bestInScore = f; bestIn = solution.map(r=>r.slice()); }
+                } else {
+                    const gap = m.passes < band[0] ? band[0]-m.passes : m.passes-band[1];
+                    if (gap < bestNearGap) { bestNearGap = gap; bestNear = solution.map(r=>r.slice()); }
+                }
+            }
+            if (bestIn) solution = bestIn;
+            else if (bestNear) solution = bestNear;
+        }
+
+        function _genOnce() {
             if (activeGenerationMode === 0) {
                 // 0. 최초의 랜덤 방식 (밀도 60%)
                 activeModeName = "[기본 방식: 최초의 랜덤 방식]";
