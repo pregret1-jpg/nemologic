@@ -723,90 +723,143 @@
             }
         }
 
-        // --- 스타터 힌트 교차점 간섭 보정 함수 ---
-        function applyStarterHints() {
-            let minLen = 3, maxLen = 4;
-            if (size === 10) { minLen = 7; maxLen = 8; }
-            else if (size === 15) { minLen = 10; maxLen = 12; }
-            
-            const len = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
-            const isRow = Math.random() < 0.5;
-
-            if (isRow) {
-                const targetRow = Math.floor(Math.random() * size);
-                const startPos = Math.floor(Math.random() * (size - len + 1));
+        // --- 고립 싱글톤(1x1 픽셀) 정돈 함수 ---
+        function cleanSingletons(solution, size) {
+            for (let r = 0; r < size; r++) {
                 for (let c = 0; c < size; c++) {
-                    solution[targetRow][c] = (c >= startPos && c < startPos + len) ? 1 : 0;
+                    if (solution[r][c] === 1) {
+                        const left = c > 0 ? solution[r][c - 1] : 0;
+                        const right = c < size - 1 ? solution[r][c + 1] : 0;
+                        const top = r > 0 ? solution[r - 1][c] : 0;
+                        const bottom = r < size - 1 ? solution[r + 1][c] : 0;
+                        if (left === 0 && right === 0 && top === 0 && bottom === 0) {
+                            if (Math.random() < 0.6) {
+                                if (c < size - 1) solution[r][c + 1] = 1;
+                                else if (c > 0) solution[r][c - 1] = 1;
+                            } else {
+                                solution[r][c] = 0;
+                            }
+                        }
+                    }
                 }
-            } else {
-                const targetCol = Math.floor(Math.random() * size);
+            }
+        }
+
+        // --- 다변화된 시작 단서(Starter Seed) 주입 함수 ---
+        function applyDiverseStarterPattern(solution, size, patternType) {
+            const isRow = Math.random() < 0.5;
+            const target = Math.floor(Math.random() * size);
+            
+            if (patternType === 0) {
+                // 패턴 0: 합계 꽉 찬 줄 (Dense Multi-block Line, 예: 3 4 1 등)
+                if (isRow) {
+                    let pos = 0;
+                    while (pos < size) {
+                        let block = Math.floor(Math.random() * 3) + 2;
+                        for (let i = 0; i < block && pos + i < size; i++) solution[target][pos + i] = 1;
+                        pos += block;
+                        if (pos < size) { solution[target][pos] = 0; pos++; }
+                    }
+                } else {
+                    let pos = 0;
+                    while (pos < size) {
+                        let block = Math.floor(Math.random() * 3) + 2;
+                        for (let i = 0; i < block && pos + i < size; i++) solution[pos + i][target] = 1;
+                        pos += block;
+                        if (pos < size) { solution[pos][target] = 0; pos++; }
+                    }
+                }
+            } else if (patternType === 1) {
+                // 패턴 1: 단일 겹침 블록 (Single Overlap Block)
+                let minLen = size === 10 ? 6 : (size === 15 ? 9 : 3);
+                let maxLen = size === 10 ? 8 : (size === 15 ? 12 : 4);
+                const len = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
                 const startPos = Math.floor(Math.random() * (size - len + 1));
-                for (let r = 0; r < size; r++) {
-                    solution[r][targetCol] = (r >= startPos && r < startPos + len) ? 1 : 0;
+                if (isRow) {
+                    for (let c = 0; c < size; c++) solution[target][c] = (c >= startPos && c < startPos + len) ? 1 : 0;
+                } else {
+                    for (let r = 0; r < size; r++) solution[r][target] = (r >= startPos && r < startPos + len) ? 1 : 0;
+                }
+            } else if (patternType === 2) {
+                // 패턴 2: 모서리 앵커 (Corner Anchor)
+                const top = Math.random() < 0.5;
+                const left = Math.random() < 0.5;
+                const rStart = top ? 0 : size - 3;
+                const cStart = left ? 0 : size - 3;
+                for (let r = rStart; r < rStart + 3 && r < size; r++) {
+                    for (let c = cStart; c < cStart + 3 && c < size; c++) {
+                        solution[r][c] = (Math.random() < 0.7) ? 1 : 0;
+                    }
+                }
+            } else if (patternType === 3) {
+                // 패턴 3: 중앙 십자선 교차 실마리 (Center Cross Seed)
+                const mid = Math.floor(size / 2);
+                const span = Math.floor(size * 0.6);
+                const offset = Math.floor((size - span) / 2);
+                for (let i = offset; i < offset + span; i++) {
+                    if (Math.random() < 0.8) solution[mid][i] = 1;
+                    if (Math.random() < 0.8) solution[i][mid] = 1;
                 }
             }
         }
 
         function getQualityConfig(attempts, size) {
-            if (attempts > 120) {
-                // Level 4: basic solvability only
-                return { minDensity: 0.25, maxDensity: 0.70, maxHintLimit: size, starterHintThreshold: 1, maxSegmentsLimit: size, minIterations: 1 };
-            } else if (attempts > 80) {
-                // Level 3: allow slightly simpler and more segmented
-                return { minDensity: 0.33, maxDensity: 0.60, maxHintLimit: size === 10 ? 8 : 13, starterHintThreshold: size === 10 ? 5 : 8, maxSegmentsLimit: size === 10 ? 4 : 5, minIterations: 2 };
-            } else if (attempts > 40) {
-                // Level 2: density and iterations slightly relaxed
-                return { minDensity: 0.35, maxDensity: 0.55, maxHintLimit: size === 10 ? 7 : 11, starterHintThreshold: size === 10 ? 6 : 9, maxSegmentsLimit: size === 10 ? 3 : 4, minIterations: 2 };
+            if (attempts > 50) {
+                return { minDensity: 0.25, maxDensity: 0.70, minFirstPass: 1, minIterations: 1 };
+            } else if (attempts > 25) {
+                return { minDensity: 0.30, maxDensity: 0.65, minFirstPass: size === 10 ? 2 : (size === 15 ? 3 : 1), minIterations: 2 };
+            } else if (attempts > 10) {
+                return { minDensity: 0.32, maxDensity: 0.62, minFirstPass: size === 10 ? 3 : (size === 15 ? 4 : 2), minIterations: 2 };
             } else {
-                // Level 1: strict high quality
-                return { minDensity: 0.38, maxDensity: 0.52, maxHintLimit: size === 10 ? 7 : 11, starterHintThreshold: size === 10 ? 6 : 9, maxSegmentsLimit: size === 10 ? 3 : 4, minIterations: 3 };
+                return { minDensity: 0.33, maxDensity: 0.60, minFirstPass: size === 10 ? 3 : (size === 15 ? 4 : 2), minIterations: 2 };
             }
         }
 
+        // --- 다각적 퍼즐 품질 및 첫 수 풀이(First-Pass) 평가 함수 ---
         function evaluatePuzzleQuality(size, solution, config = {}) {
             const rowHints = solution.map(row => getHints(row));
             const colHints = Array(size).fill().map((_, c) => getHints(solution.map(row => row[c])));
             
-            // 1. Density Check (default: 38% ~ 52%)
+            // 1. 밀도 체크 (기본: 33% ~ 60%)
             const filledCount = solution.flat().filter(v => v === 1).length;
             const density = filledCount / (size * size);
-            let minDensity = config.minDensity !== undefined ? config.minDensity : 0.38;
-            let maxDensity = config.maxDensity !== undefined ? config.maxDensity : 0.52;
+            let minDensity = config.minDensity !== undefined ? config.minDensity : 0.32;
+            let maxDensity = config.maxDensity !== undefined ? config.maxDensity : 0.62;
             if (density < minDensity || density > maxDensity) return { ok: false, reason: "density" };
 
-            // 2. Clue Constraints
-            let maxHintLimit = config.maxHintLimit || (size === 10 ? 7 : (size === 15 ? 11 : 4));
-            let starterHintThreshold = config.starterHintThreshold || (size === 10 ? 6 : (size === 15 ? 9 : 3));
-            let maxSegmentsLimit = config.maxSegmentsLimit || (size === 10 ? 3 : (size === 15 ? 4 : 2));
-            
-            let hasStarterHint = false;
-            
-            // Check row hints
-            for (let r = 0; r < size; r++) {
-                const hints = rowHints[r];
-                if (hints.length > maxSegmentsLimit) return { ok: false, reason: "fragmentation" };
-                for (let h of hints) {
-                    if (h > maxHintLimit) return { ok: false, reason: "too_easy" };
-                    if (h >= starterHintThreshold) hasStarterHint = true;
-                }
-            }
-            
-            // Check col hints
-            for (let c = 0; c < size; c++) {
-                const hints = colHints[c];
-                if (hints.length > maxSegmentsLimit) return { ok: false, reason: "fragmentation" };
-                for (let h of hints) {
-                    if (h > maxHintLimit) return { ok: false, reason: "too_easy" };
-                    if (h >= starterHintThreshold) hasStarterHint = true;
-                }
-            }
-            
-            if (!hasStarterHint) return { ok: false, reason: "no_starter" };
-
-            // 3. Solve & Iteration count check (Cascade Depth)
+            // 2. 첫 수 확정 셀(First-Pass Deductions) 평가
             const board = Array(size).fill().map(() => Array(size).fill(0));
+            let firstPassCells = 0;
+
+            for (let r = 0; r < size; r++) {
+                const solved = solveLine(size, rowHints[r], board[r]);
+                if (!solved) return { ok: false, reason: "unsolvable" };
+                for (let c = 0; c < size; c++) {
+                    if (solved[c] !== 0) {
+                        board[r][c] = solved[c];
+                        firstPassCells++;
+                    }
+                }
+            }
+
+            for (let c = 0; c < size; c++) {
+                const currentLine = board.map(row => row[c]);
+                const solved = solveLine(size, colHints[c], currentLine);
+                if (!solved) return { ok: false, reason: "unsolvable" };
+                for (let r = 0; r < size; r++) {
+                    if (board[r][c] === 0 && solved[r] !== 0) {
+                        board[r][c] = solved[r];
+                        firstPassCells++;
+                    }
+                }
+            }
+
+            let minFirstPass = config.minFirstPass !== undefined ? config.minFirstPass : (size === 10 ? 3 : (size === 15 ? 4 : 2));
+            if (firstPassCells < minFirstPass) return { ok: false, reason: "no_starter" };
+
+            // 3. 연쇄 추론(Cascade) 완결성 검증
             let changed = true;
-            let iterations = 0;
+            let iterations = 1;
             const maxIterations = size * 3;
 
             while (changed && iterations < maxIterations) {
@@ -837,293 +890,184 @@
                 }
             }
 
-            // Check if fully solved
+            // 모든 칸이 확정되었는지 확인
             for (let r = 0; r < size; r++) {
                 for (let c = 0; c < size; c++) {
                     if (board[r][c] === 0) return { ok: false, reason: "incomplete" };
                 }
             }
 
-            // Iterations check: cascade depth
-            let minIterations = config.minIterations !== undefined ? config.minIterations : 3;
+            // 연쇄 단계 확인
+            let minIterations = config.minIterations !== undefined ? config.minIterations : 2;
             if (iterations < minIterations) return { ok: false, reason: "too_simple" };
 
-            return { ok: true, iterations: iterations };
+            return { ok: true, iterations: iterations, firstPassCells: firstPassCells };
         }
 
         function generateRandomSolution() {
             if (activeGenerationMode === 0) {
-                // 0. 최초의 랜덤 방식 (밀도 60%)
-                activeModeName = "[기본 방식: 최초의 랜덤 방식]";
-                activeModeDesc = "순수 무작위 난수 맵이며, 100% 논리로 해결 가능합니다.";
+                // 0. 자연 밸런스 모드
+                activeModeName = "[자연 밸런스 모드]";
+                activeModeDesc = "순수 무작위 노이즈에서 자연 발생한 실타래로 풀어나가는 클래식 맵입니다.";
                 
                 let solvable = false;
                 let attempts = 0;
                 while (!solvable && attempts < 100) {
                     attempts++;
                     solution = Array(size).fill().map(() => 
-                        Array(size).fill().map(() => Math.random() > 0.4 ? 1 : 0)
+                        Array(size).fill().map(() => Math.random() < 0.48 ? 1 : 0)
                     );
-                    solvable = isLogicallySolvable(size, solution);
+                    cleanSingletons(solution, size);
+                    if (Math.random() < 0.6) {
+                        applyDiverseStarterPattern(solution, size, Math.floor(Math.random() * 4));
+                    }
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
                 }
                 
-                if (!solvable) {
-                    fallbackToBasicSolvable();
-                }
+                if (!solvable) fallbackToBasicSolvable();
             } 
             else if (activeGenerationMode === 1) {
-                // 1. 100% 논리 풀이 보장 (No-Guessing)
-                activeModeName = "[1번 방식: 100% 논리 풀이 보장] (쉬움)";
-                activeModeDesc = "가로 또는 세로 1줄의 스타터 힌트가 보장되어 첫 실마리를 찾기 좋은 100% 논리적 맵입니다.";
-                
-                let solvable = false;
-                let attempts = 0;
-                while (!solvable && attempts < 150) {
-                    attempts++;
-                    // 연속성 확보를 위해 이전 셀의 영향을 받도록 생성 (파편화 방지)
-                    solution = Array(size).fill().map(() => Array(size).fill(0));
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            let left = c > 0 ? solution[r][c - 1] : 0;
-                            let top = r > 0 ? solution[r - 1][c] : 0;
-                            let prob = 0.28;
-                            if (left === 1 || top === 1) {
-                                prob = 0.62;
-                            }
-                            solution[r][c] = Math.random() < prob ? 1 : 0;
-                        }
-                    }
-
-                    // 외톨이 점(1x1) 감지 및 주변 병합/제거
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            if (solution[r][c] === 1) {
-                                const left = c > 0 ? solution[r][c - 1] : 0;
-                                const right = c < size - 1 ? solution[r][c + 1] : 0;
-                                if (left === 0 && right === 0) {
-                                    if (Math.random() < 0.6) {
-                                        if (c < size - 1) solution[r][c + 1] = 1;
-                                        else if (c > 0) solution[r][c - 1] = 1;
-                                    } else {
-                                        solution[r][c] = 0;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    applyStarterHints();
-                    
-                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
-                    solvable = quality.ok;
-                }
-                
-                if (!solvable) {
-                    fallbackToBasicSolvable();
-                }
-            } 
-            else if (activeGenerationMode === 2) {
-                // 2. '뼈대와 구멍' 위주의 외곽선 배치 (뭉침 방지)
-                activeModeName = "[2번 방식: 외곽선 & 뼈대 방식] (쉬움)";
-                activeModeDesc = "가로 또는 세로 1줄의 스타터 힌트가 보장되는 뼈대형 맵입니다.";
-                
-                let solvable = false;
-                let attempts = 0;
-                while (!solvable && attempts < 150) {
-                    attempts++;
-                    
-                    solution = Array(size).fill().map(() => Array(size).fill(0));
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            let neighbors = 0;
-                            for (let dr = -1; dr <= 1; dr++) {
-                                for (let dc = -1; dc <= 1; dc++) {
-                                    if (dr === 0 && dc === 0) continue;
-                                    const nr = r + dr;
-                                    const nc = c + dc;
-                                    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
-                                        if (solution[nr][nc] === 1) neighbors++;
-                                    }
-                                }
-                            }
-                            let prob = 0.45;
-                            if (neighbors >= 3) prob = 0.08; 
-                            solution[r][c] = Math.random() < prob ? 1 : 0;
-                        }
-                    }
-                    
-                    // 연속 칠하기 한도 제한 (연속 길이 상향하여 난이도 하향)
-                    const maxCon = Math.max(4, Math.floor(size * 0.7));
-                    for (let r = 0; r < size; r++) {
-                        let con = 0;
-                        for (let c = 0; c < size; c++) {
-                            if (solution[r][c] === 1) {
-                                con++;
-                                if (con > maxCon) { solution[r][c] = 0; con = 0; }
-                            } else con = 0;
-                        }
-                    }
-
-                    // 외톨이 점(1x1) 감지 및 주변 병합/제거
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            if (solution[r][c] === 1) {
-                                const left = c > 0 ? solution[r][c - 1] : 0;
-                                const right = c < size - 1 ? solution[r][c + 1] : 0;
-                                if (left === 0 && right === 0) {
-                                    if (Math.random() < 0.6) {
-                                        if (c < size - 1) solution[r][c + 1] = 1;
-                                        else if (c > 0) solution[r][c - 1] = 1;
-                                    } else {
-                                        solution[r][c] = 0;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    applyStarterHints();
-                    
-                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
-                    solvable = quality.ok;
-                }
-                
-                if (!solvable) {
-                    fallbackToBasicSolvable();
-                }
-            } 
-            else if (activeGenerationMode === 3) {
-                // 3. 실타래 시작점 방식
-                activeModeName = "[3번 방식: 실타래 시작점 방식] (쉬움)";
-                activeModeDesc = "가로 또는 세로 1줄의 스타터 힌트가 보장되며, 100% 논리로 풀립니다.";
-                
-                let solvable = false;
-                let attempts = 0;
-                while (!solvable && attempts < 150) {
-                    attempts++;
-                    
-                    // 1단계: 주변 이웃을 고려해 싱글톤(1칸 점)이 적은 기본 맵 생성 (연속성 상향)
-                    solution = Array(size).fill().map(() => Array(size).fill(0));
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            let neighbors = 0;
-                            for (let dr = -1; dr <= 1; dr++) {
-                                for (let dc = -1; dc <= 1; dc++) {
-                                    if (dr === 0 && dc === 0) continue;
-                                    const nr = r + dr;
-                                    const nc = c + dc;
-                                    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
-                                        if (solution[nr][nc] === 1) neighbors++;
-                                    }
-                                }
-                            }
-                            // 이웃이 있으면 더 높은 확률로 채워지게 하여 뭉치게 만듦 (싱글톤 방지)
-                            let prob = neighbors >= 1 ? 0.60 : 0.28; 
-                            solution[r][c] = Math.random() < prob ? 1 : 0;
-                        }
-                    }
-                    
-                    // 2단계: 싱글톤 픽셀 감지 및 주변 병합/제거
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            if (solution[r][c] === 1) {
-                                const left = c > 0 ? solution[r][c - 1] : 0;
-                                const right = c < size - 1 ? solution[r][c + 1] : 0;
-                                if (left === 0 && right === 0) {
-                                    if (Math.random() < 0.6) {
-                                        if (c < size - 1) solution[r][c + 1] = 1;
-                                        else if (c > 0) solution[r][c - 1] = 1;
-                                    } else {
-                                        solution[r][c] = 0;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    applyStarterHints();
-                    
-                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
-                    solvable = quality.ok;
-                }
-                
-                // 100번 안에 완벽한 맵을 못 찾았을 경우 대비한 백업 안전장치
-                if (!solvable) {
-                    fallbackToBasicSolvable();
-                }
-            } 
-            else if (activeGenerationMode === 4) {
-                // 4. 최적의 밀도 밸런스
-                activeModeName = "[4번 방식: 최적 밀도 밸런스] (쉬움)";
-                activeModeDesc = "가로 또는 세로 1줄의 스타터 힌트가 보장되어 첫 실마리를 잡기 편한 최적 밀도 맵입니다.";
-                
-                let solvable = false;
-                let attempts = 0;
-                while (!solvable && attempts < 150) {
-                    attempts++;
-                    
-                    // 1단계: 주변 이웃을 고려해 싱글톤(1칸 점)이 적은 기본 맵 생성 (연속성 상향)
-                    solution = Array(size).fill().map(() => Array(size).fill(0));
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            let neighbors = 0;
-                            for (let dr = -1; dr <= 1; dr++) {
-                                for (let dc = -1; dc <= 1; dc++) {
-                                    if (dr === 0 && dc === 0) continue;
-                                    const nr = r + dr;
-                                    const nc = c + dc;
-                                    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
-                                        if (solution[nr][nc] === 1) neighbors++;
-                                    }
-                                }
-                            }
-                            let prob = neighbors >= 1 ? 0.58 : 0.28; 
-                            solution[r][c] = Math.random() < prob ? 1 : 0;
-                        }
-                    }
-                    
-                    // 2단계: 싱글톤 픽셀 감지 및 주변 병합/제거
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            if (solution[r][c] === 1) {
-                                const left = c > 0 ? solution[r][c - 1] : 0;
-                                const right = c < size - 1 ? solution[r][c + 1] : 0;
-                                if (left === 0 && right === 0) {
-                                    if (Math.random() < 0.6) {
-                                        if (c < size - 1) solution[r][c + 1] = 1;
-                                        else if (c > 0) solution[r][c - 1] = 1;
-                                    } else {
-                                        solution[r][c] = 0;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    applyStarterHints();
-                    
-                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
-                    solvable = quality.ok;
-                }
-                
-                // 100번 안에 완벽한 맵을 못 찾았을 경우 대비한 백업
-                if (!solvable) {
-                    fallbackToBasicSolvable();
-                }
-            } 
-            else {
-                // 5. 예측 불가능한 도안의 반전 (기하학 대칭 패턴)
-                activeModeName = "[5번 방식: 기하학 대칭 방식]";
-                activeModeDesc = "기하학적 대칭 구조를 띠고 있으며, 100% 논리로 해결 가능합니다.";
+                // 1. 기하학 블록 & 미로 모드
+                activeModeName = "[기하학 블록 & 미로 모드]";
+                activeModeDesc = "사각 블록과 통로가 얽힌 건축적 구조로 시원시원한 영역 확정이 매력적인 맵입니다.";
                 
                 let solvable = false;
                 let attempts = 0;
                 while (!solvable && attempts < 100) {
                     attempts++;
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
+                    
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            let left = c > 0 ? solution[r][c - 1] : 0;
+                            let top = r > 0 ? solution[r - 1][c] : 0;
+                            let prob = (left === 1 || top === 1) ? 0.65 : 0.22;
+                            solution[r][c] = Math.random() < prob ? 1 : 0;
+                        }
+                    }
+
+                    const blockCount = size === 10 ? 2 : (size === 15 ? 3 : 1);
+                    for (let b = 0; b < blockCount; b++) {
+                        const bw = Math.floor(Math.random() * 3) + 2;
+                        const bh = Math.floor(Math.random() * 2) + 2;
+                        const br = Math.floor(Math.random() * (size - bh + 1));
+                        const bc = Math.floor(Math.random() * (size - bw + 1));
+                        for (let r = br; r < br + bh; r++) {
+                            for (let c = bc; c < bc + bw; c++) solution[r][c] = 1;
+                        }
+                    }
+
+                    cleanSingletons(solution, size);
+                    applyDiverseStarterPattern(solution, size, Math.random() < 0.5 ? 0 : 1);
+                    
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
+                }
+                
+                if (!solvable) fallbackToBasicSolvable();
+            } 
+            else if (activeGenerationMode === 2) {
+                // 2. 외곽 프레임 & 액자 모드
+                activeModeName = "[외곽 프레임 & 액자 모드]";
+                activeModeDesc = "테두리와 모서리 힌트부터 시작하여 안쪽으로 점차 좁혀 들어가는 입체적 맵입니다.";
+                
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
+                    
+                    for (let i = 0; i < size; i++) {
+                        if (Math.random() < 0.65) solution[0][i] = 1;
+                        if (Math.random() < 0.65) solution[size - 1][i] = 1;
+                        if (Math.random() < 0.65) solution[i][0] = 1;
+                        if (Math.random() < 0.65) solution[i][size - 1] = 1;
+                    }
+                    for (let r = 1; r < size - 1; r++) {
+                        for (let c = 1; c < size - 1; c++) {
+                            solution[r][c] = Math.random() < 0.35 ? 1 : 0;
+                        }
+                    }
+
+                    cleanSingletons(solution, size);
+                    applyDiverseStarterPattern(solution, size, 2);
+                    
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
+                }
+                
+                if (!solvable) fallbackToBasicSolvable();
+            } 
+            else if (activeGenerationMode === 3) {
+                // 3. 체크 & 리듬 도트 모드
+                activeModeName = "[체크 & 리듬 도트 모드]";
+                activeModeDesc = "잘게 쪼개진 힌트로 X(빈칸)를 적극적으로 마킹하며 풀어가는 손맛 중심 맵입니다.";
+                
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
+                    
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            const isGrid = (r + c) % 2 === 0;
+                            let prob = isGrid ? 0.68 : 0.28;
+                            solution[r][c] = Math.random() < prob ? 1 : 0;
+                        }
+                    }
+                    
+                    cleanSingletons(solution, size);
+                    applyDiverseStarterPattern(solution, size, Math.random() < 0.6 ? 0 : 1);
+                    
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
+                }
+                
+                if (!solvable) fallbackToBasicSolvable();
+            } 
+            else if (activeGenerationMode === 4) {
+                // 4. 중앙 코어 & 군도 모드
+                activeModeName = "[중앙 코어 & 군도 모드]";
+                activeModeDesc = "중앙의 단단한 코어에서 시작해 주변 위성 섬들로 퍼져나가는 방사형 맵입니다.";
+                
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
+                    
+                    const pad = Math.floor(size * 0.22);
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            const inCore = (r >= pad && r < size - pad && c >= pad && c < size - pad);
+                            solution[r][c] = Math.random() < (inCore ? 0.62 : 0.28) ? 1 : 0;
+                        }
+                    }
+
+                    cleanSingletons(solution, size);
+                    applyDiverseStarterPattern(solution, size, 3);
+                    
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
+                }
+                
+                if (!solvable) fallbackToBasicSolvable();
+            } 
+            else {
+                // 5. 만화경 대칭 모드
+                activeModeName = "[만화경 대칭 모드]";
+                activeModeDesc = "좌우/상하/4분면의 기하학적 대칭 구조로 양쪽의 균형을 맞춰가며 푸는 맵입니다.";
+                
+                let solvable = false;
+                let attempts = 0;
+                while (!solvable && attempts < 100) {
+                    attempts++;
+                    solution = Array(size).fill().map(() => Array(size).fill(0));
                     
                     const symType = Math.floor(Math.random() * 3); 
-                    solution = Array(size).fill().map(() => Array(size).fill(0));
-                    const density = 0.45;
+                    const density = 0.46;
                     
                     if (symType === 0) {
                         const halfCols = Math.ceil(size / 2);
@@ -1156,13 +1100,15 @@
                             }
                         }
                     }
+
+                    cleanSingletons(solution, size);
+                    if (Math.random() < 0.5) applyDiverseStarterPattern(solution, size, 1);
                     
-                    solvable = isLogicallySolvable(size, solution);
+                    const quality = evaluatePuzzleQuality(size, solution, getQualityConfig(attempts, size));
+                    solvable = quality.ok;
                 }
                 
-                if (!solvable) {
-                    fallbackToBasicSolvable();
-                }
+                if (!solvable) fallbackToBasicSolvable();
             }
             
             // 빈 판 방지 예외 처리
