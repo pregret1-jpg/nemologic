@@ -1,0 +1,15 @@
+﻿# OS / Editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+
+# Archives & Backups
+*.zip
+*.tar.gz
+*.7z
+
+# Temporary & Registration Assets
+err_img.png
+토스등록/
