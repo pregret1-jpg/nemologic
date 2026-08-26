@@ -409,11 +409,22 @@
             font-size: 16px;
             border-radius: 8px;
             cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
+            transition: background 0.2s, transform 0.2s, opacity 0.4s ease;
             font-weight: bold;
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+            transform: translateY(8px);
         }
 
-        .modal-btn:hover {
+        .modal-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .modal-btn.visible:hover {
             background-color: var(--btn-success-hover);
             transform: translateY(-2px);
         }
@@ -541,9 +552,74 @@
             margin-bottom: 2px;
             text-align: center;
         }
-        .modal-ad .ad-badge {
-            color: var(--btn-success);
-            margin-bottom: 4px;
+        /* 승리 모달 보상 상자 스타일 */
+        .reward-card {
+            background: linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(249, 115, 22, 0.12));
+            border: 2px dashed #f59e0b;
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin: 10px 0 18px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            box-sizing: border-box;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        body.dark-theme .reward-card {
+            background: linear-gradient(135deg, rgba(234, 179, 8, 0.18), rgba(249, 115, 22, 0.18));
+            border-color: #fbbf24;
+        }
+        .reward-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #d97706;
+        }
+        body.dark-theme .reward-header {
+            color: #fbbf24;
+        }
+        .reward-box-icon {
+            font-size: 20px;
+            display: inline-block;
+            animation: giftBounce 1.5s infinite ease-in-out;
+        }
+        @keyframes giftBounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-4px) scale(1.12); }
+        }
+        .reward-subtext {
+            font-size: 11.5px;
+            color: var(--text-secondary) !important;
+            margin: 0 !important;
+            line-height: 1.3;
+        }
+        .reward-btn-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            color: white !important;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 9px 18px;
+            border-radius: 20px;
+            text-decoration: none;
+            box-shadow: 0 4px 10px rgba(234, 88, 12, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 4px;
+        }
+        .reward-btn-link:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 6px 14px rgba(234, 88, 12, 0.4);
+        }
+        .reward-card .ad-disclosure {
+            font-size: 10.5px;
+            color: var(--text-muted);
+            margin-top: 2px;
         }
 
         /* PC 양옆 사이드 배너 */
@@ -635,14 +711,20 @@
             <p>네모로직 퍼즐을 성공적으로 해결하셨습니다!</p>
             <p id="modalClearCount" style="font-weight: 600; color: var(--btn-success); margin-top: -10px; margin-bottom: 20px;">누적 완료 횟수: 0회</p>
             
-            <!-- 모달 내부 쿠팡 배너 -->
-            <div class="ad-container modal-ad">
-                <span class="ad-badge">🎉 클리어 기념 추천 특가</span>
-                <a href="https://link.coupang.com/a/gweGSWyd6O" target="_blank" referrerpolicy="unsafe-url"><img src="https://ads-partners.coupang.com/banners/1019840?trackingCode=AF9227158&subId=&traceId=V0-301-879dd1202e5c73b2&w=150&h=60" alt="쿠팡 배너"></a>
+            <!-- 클리어 보상 선물 상자 카드 -->
+            <div class="reward-card">
+                <div class="reward-header">
+                    <span class="reward-box-icon">🎁</span>
+                    <span>클리어 보너스 특가 선물</span>
+                </div>
+                <p class="reward-subtext">두뇌 회전 후 당충전 간식 & 로직 퍼즐북 모음전</p>
+                <a href="https://link.coupang.com/a/gweGSWyd6O" target="_blank" referrerpolicy="unsafe-url" class="reward-btn-link">
+                    <span>🎁 오늘의 특가 선물 열어보기</span>
+                </a>
                 <div class="ad-disclosure">이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</div>
             </div>
 
-            <button class="modal-btn" onclick="startNewGameFromModal()">새 게임 시작하기</button>
+            <button id="modalNewGameBtn" class="modal-btn" onclick="startNewGameFromModal()">새 게임 시작하기</button>
         </div>
     </div>
 
@@ -1484,16 +1566,37 @@
             }
         }
 
+        let modalBtnTimer = null;
+
         function showModal() {
             const modal = document.getElementById('victoryModal');
+            const newGameBtn = document.getElementById('modalNewGameBtn');
+            if (newGameBtn) {
+                newGameBtn.classList.remove('visible');
+            }
+            if (modalBtnTimer) {
+                clearTimeout(modalBtnTimer);
+            }
             modal.style.display = 'flex';
             setTimeout(() => {
                 modal.classList.add('show');
             }, 10);
+            modalBtnTimer = setTimeout(() => {
+                if (newGameBtn) {
+                    newGameBtn.classList.add('visible');
+                }
+            }, 3000);
         }
 
         function closeModal() {
+            if (modalBtnTimer) {
+                clearTimeout(modalBtnTimer);
+            }
             const modal = document.getElementById('victoryModal');
+            const newGameBtn = document.getElementById('modalNewGameBtn');
+            if (newGameBtn) {
+                newGameBtn.classList.remove('visible');
+            }
             modal.classList.remove('show');
             setTimeout(() => {
                 modal.style.display = 'none';
